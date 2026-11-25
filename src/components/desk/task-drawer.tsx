@@ -1,0 +1,180 @@
+import { format } from "date-fns";
+import { Paperclip, X } from "lucide-react";
+import { useRef, useState } from "react";
+import { parseISODate } from "@/lib/desk/dates";
+import { useDesk } from "@/lib/desk/store";
+import { repeatLabel, taskRepeat, type Priority, type Repeat } from "@/lib/desk/types";
+
+function sizeLabel(size: number): string {
+  if (size < 1024) return `${size} B`;
+  if (size < 1048576) return `${Math.round(size / 1024)} KB`;
+  return `${(size / 1048576).toFixed(1)} MB`;
+}
+
+export function TaskDrawer() {
+  const data = useDesk((s) => s.data);
+  const user = useDesk((s) => s.user);
+  const editorId = useDesk((s) => s.editorId);
+  const openTask = useDesk((s) => s.openTask);
+  const updateTask = useDesk((s) => s.updateTask);
+  const assignTask = useDesk((s) => s.assignTask);
+  const moveTask = useDesk((s) => s.moveTask);
+  const moveOn = useDesk((s) => s.moveOn);
+  const toggleDone = useDesk((s) => s.toggleDone);
+  const addNote = useDesk((s) => s.addNote);
+  const removeTask = useDesk((s) => s.removeTask);
+  const downloadAttachment = useDesk((s) => s.downloadAttachment);
+  const attachFiles = useDesk((s) => s.attachFiles);
+  const [note, setNote] = useState("");
+  const [confirming, setConfirming] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  if (!data || !user || !editorId) return null;
+  const task = data.tasks.find((item) => item.id === editorId);
+  if (!task) return null;
+  const notes = data.notes.filter((item) => item.taskId === task.id);
+  const files = data.attachments.filter((item) => item.taskId === task.id);
+  const assignee = data.users.find((item) => item.id === task.assigneeId);
+  const hint =
+    task.assigneeId === user.id
+      ? "This sits on your own desk."
+      : user.role === "manager"
+        ? `${assignee?.name ?? "They"} get it straight away. A manager does not need acceptance.`
+        : `${assignee?.name ?? "They"} will be asked to accept it.`;
+
+  return (
+    <div className="fixed inset-0 z-40 flex justify-end bg-navy/35" onClick={() => openTask(null)}>
+      <aside
+        data-drop-task={task.id}
+        className="drawer flex h-full flex-col overflow-y-auto bg-card shadow-2xl"
+        role="dialog"
+        aria-label={task.title}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4">
+          <h2 className="text-xl font-semibold text-navy">Task</h2>
+          <button type="button" className="btn btn-ghost min-w-11 px-3" aria-label="Close task" onClick={() => openTask(null)}>
+            <X className="size-4" aria-hidden="true" />
+          </button>
+        </div>
+        <div className="grid gap-4 px-5 py-5">
+          <label>
+            <span className="label">Title</span>
+            <input className="input" value={task.title} autoFocus={task.title === "New task"} onChange={(event) => updateTask(task.id, { title: event.target.value })} />
+          </label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label>
+              <span className="label">Priority</span>
+              <select className="input" value={task.priority} onChange={(event) => updateTask(task.id, { priority: event.target.value as Priority })}>
+                <option value="high">High</option>
+                <option value="normal">Normal</option>
+                <option value="low">Low</option>
+              </select>
+            </label>
+            <label>
+              <span className="label">Date</span>
+              <input className="input" type="date" value={task.date} onChange={(event) => moveTask(task.id, event.target.value)} />
+            </label>
+            <label>
+              <span className="label">Repeats</span>
+              <select className="input" value={taskRepeat(task)} onChange={(event) => updateTask(task.id, { repeat: event.target.value as Repeat })}>
+                <option value="once">{repeatLabel("once")}</option>
+                <option value="daily">{repeatLabel("daily")}</option>
+                <option value="weekly">{repeatLabel("weekly")}</option>
+                <option value="monthly">{repeatLabel("monthly")}</option>
+                <option value="annual">{repeatLabel("annual")}</option>
+              </select>
+            </label>
+            <label>
+              <span className="label">Time (optional)</span>
+              <input className="input" type="time" value={task.time} onChange={(event) => updateTask(task.id, { time: event.target.value })} />
+            </label>
+          </div>
+          <label>
+            <span className="label">Assign to</span>
+            <select className="input" value={task.assigneeId} onChange={(event) => assignTask(task.id, event.target.value)}>
+              {data.users.map((person) => (
+                <option key={person.id} value={person.id}>{person.name}</option>
+              ))}
+            </select>
+            <span className="mt-2 block text-sm text-muted">{hint}</span>
+          </label>
+          {task.returnNote ? <p className="rounded-md bg-paper px-3 py-2 text-sm text-navy">Returned: {task.returnNote}</p> : null}
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn btn-navy" onClick={() => moveOn(task.id)}>Move on</button>
+            {task.status !== "pending" ? (
+              <button type="button" className="btn btn-ghost" onClick={() => toggleDone(task.id)}>
+                {task.status === "done" ? "Reopen" : "Mark done"}
+              </button>
+            ) : null}
+          </div>
+          <section>
+            <h3 className="label">Notes</h3>
+            <ul className="grid gap-2">
+              {notes.map((item) => (
+                <li key={item.id} className="rounded-md bg-paper px-3 py-2">
+                  <p className="text-sm">{item.body}</p>
+                  <p className="mt-1 text-xs text-muted">
+                    {data.users.find((person) => person.id === item.authorId)?.name} · {format(new Date(item.createdAt), "d MMM, HH:mm")}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            <form
+              className="mt-3 grid gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                addNote(task.id, note);
+                setNote("");
+              }}
+            >
+              <textarea className="input min-h-24 py-2" placeholder="Add a note" value={note} onChange={(event) => setNote(event.target.value)} />
+              <button className="btn btn-ghost justify-self-start" type="submit">Add note</button>
+            </form>
+          </section>
+          <section>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="label">Files</h3>
+              <button type="button" className="btn btn-ghost" onClick={() => fileRef.current?.click()}>
+                <Paperclip className="size-4" aria-hidden="true" />
+                Attach a file
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                multiple
+                className="sr-only"
+                aria-label="Attach a file"
+                onChange={(event) => {
+                  const files = [...(event.target.files ?? [])];
+                  event.target.value = "";
+                  if (files.length) void attachFiles(task.id, files);
+                }}
+              />
+            </div>
+            {files.length === 0 ? <p className="text-sm text-muted">Optional. Any file type, or drop one here.</p> : (
+              <ul className="grid gap-2">
+                {files.map((file) => (
+                  <li key={file.id}>
+                    <button type="button" className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md border border-line px-3 text-left" onClick={() => void downloadAttachment(file.id)}>
+                      <span className="truncate font-medium">{file.name}</span>
+                      <span className="shrink-0 text-sm text-muted">{sizeLabel(file.size)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          <p className="text-xs text-muted">Opened {task.date ? format(parseISODate(task.date), "d MMMM yyyy") : "without a date"}.</p>
+          {confirming ? (
+            <div className="flex gap-2">
+              <button type="button" className="btn btn-navy" onClick={() => { removeTask(task.id); setConfirming(false); }}>Remove task</button>
+              <button type="button" className="btn btn-ghost" onClick={() => setConfirming(false)}>Keep it</button>
+            </div>
+          ) : (
+            <button type="button" className="btn btn-quiet justify-self-start text-danger" onClick={() => setConfirming(true)}>Remove task</button>
+          )}
+        </div>
+      </aside>
+    </div>
+  );
+}

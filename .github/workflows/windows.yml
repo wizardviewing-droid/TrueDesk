@@ -1,0 +1,36 @@
+name: Windows app
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Build the desk
+        run: npm ci && npm run build
+      - name: Package the Windows app
+        working-directory: desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: npm install && npx electron-builder --win nsis portable --x64 --publish never
+      - name: Publish the download
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view v1.0.0 >/dev/null 2>&1; then
+            gh release upload v1.0.0 desktop/release/*.exe --clobber
+          else
+            gh release create v1.0.0 desktop/release/*.exe --title "True Desk" --notes "Windows app for the accounts desk. Open TrueDesk.exe. The first person to register is the manager."
+          fi

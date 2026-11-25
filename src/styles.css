@@ -1,0 +1,211 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", "Avenir Next", "Segoe UI", sans-serif;
+  --color-navy: #01033a;
+  --color-ink: #17192c;
+  --color-muted: #5c6178;
+  --color-line: #e3dfd4;
+  --color-paper: #f3f1ea;
+  --color-card: #fffcf8;
+  --color-gold: #f0c14a;
+  --color-gold-soft: #fff4d6;
+  --color-danger: #8c2f2f;
+  --color-teal: #0f6e66;
+  --color-teal-soft: #e4f4f1;
+  --color-coral: #c2412d;
+  --color-coral-soft: #fdecea;
+  --color-sage: #1c7a46;
+  --color-sage-soft: #e5f5eb;
+  --color-sky: #1e4f8a;
+  --color-sky-soft: #e7eef8;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    background: var(--color-paper);
+    color: var(--color-ink);
+    text-wrap: pretty;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-gold);
+    outline-offset: 2px;
+  }
+  input,
+  select,
+  textarea,
+  button {
+    font: inherit;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    font-weight: 600;
+    line-height: 1.2;
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      color 160ms ease;
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .btn-gold {
+    background: var(--color-gold);
+    color: var(--color-navy);
+  }
+  .btn-gold:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-gold) 78%, white);
+  }
+  .btn-navy {
+    background: var(--color-navy);
+    color: var(--color-paper);
+  }
+  .btn-navy:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-navy) 84%, white);
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--color-ink);
+    border-color: var(--color-line);
+  }
+  .btn-ghost:hover:not(:disabled) {
+    border-color: var(--color-navy);
+  }
+  .btn-quiet {
+    background: transparent;
+    color: var(--color-muted);
+    min-height: 2.25rem;
+    padding-inline: 0.4rem;
+    font-weight: 550;
+  }
+  .btn-quiet:hover:not(:disabled) {
+    color: var(--color-navy);
+  }
+  .input {
+    width: 100%;
+    min-height: 2.75rem;
+    border: 1px solid var(--color-line);
+    background: var(--color-card);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 0.75rem;
+    color: var(--color-ink);
+  }
+  .input:focus {
+    outline: 2px solid var(--color-gold);
+    outline-offset: 1px;
+    border-color: transparent;
+  }
+  .label {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+  .card {
+    background: var(--color-card);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-md);
+  }
+  .dropzone {
+    border: 1.5px dashed var(--color-line);
+    border-radius: var(--radius-md);
+    background: var(--color-card);
+  }
+  .dropzone.is-hot {
+    border-color: var(--color-gold);
+    background: color-mix(in srgb, var(--color-gold) 18%, white);
+  }
+  .sheet-head,
+  .sheet-row {
+    display: grid;
+    grid-template-columns:
+      2.75rem 2.5rem minmax(14rem, 2.1fr) 6.5rem 7.5rem 5.25rem 6.5rem 9rem 7.5rem 4.5rem;
+    min-width: 62rem;
+  }
+  .diary-head,
+  .diary-row {
+    display: grid;
+    grid-template-columns: 8rem 5.5rem minmax(14rem, 2fr) 8rem 10rem 8rem;
+    min-width: 56rem;
+  }
+  .log-head,
+  .log-row {
+    display: grid;
+    grid-template-columns: 11rem 10rem minmax(16rem, 1fr);
+    min-width: 40rem;
+  }
+  .cell {
+    min-height: 2.5rem;
+    border-right: 1px solid var(--color-line);
+    border-bottom: 1px solid var(--color-line);
+    padding: 0.35rem 0.5rem;
+    display: flex;
+    align-items: center;
+    background: var(--color-card);
+    font-variant-numeric: tabular-nums;
+  }
+  .cell-head {
+    background: var(--color-paper);
+    color: var(--color-muted);
+    font-weight: 600;
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .cell.is-selected {
+    box-shadow: inset 0 0 0 2px var(--color-gold);
+    position: relative;
+    z-index: 1;
+  }
+  .drawer {
+    width: min(34rem, 100%);
+  }
+  .modal {
+    width: min(32rem, calc(100% - 2rem));
+  }
+  .cal-cell {
+    min-height: 6.25rem;
+  }
+}

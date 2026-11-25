@@ -1,0 +1,47 @@
+{
+  "name": "true-desk",
+  "version": "1.0.0",
+  "private": true,
+  "main": "main.cjs",
+  "description": "True Solicitors accounts desk",
+  "scripts": {
+    "dist": "electron-builder --win nsis portable --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "33.4.11",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "com.truesolicitors.desk",
+    "productName": "True Desk",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.cjs",
+      "preload.cjs"
+    ],
+    "extraResources": [
+      {
+        "from": "../.output",
+        "to": "app-server"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "shortcutName": "True Desk"
+    },
+    "portable": {
+      "artifactName": "TrueDesk.exe"
+    }
+  }
+}
