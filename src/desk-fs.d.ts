@@ -18,6 +18,7 @@ declare global {
     trueDesk?: {
       readSpreadsheets: (target: string) => Promise<{ name: string; base64: string }[]>;
       openOutlook: (url: string) => Promise<void>;
+      openFile: (name: string, base64: string) => Promise<void>;
     };
   }
 }

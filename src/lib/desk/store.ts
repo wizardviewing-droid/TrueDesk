@@ -592,8 +592,12 @@ export const useDesk = create<State>((set, get) => {
     downloadAttachment: async (id) => {
       const file = get().data?.attachments.find((item) => item.id === id);
       if (!file) return;
-      const opened = await readFile(file.id, file.name, file.mime);
-      if (!opened) get().showToast("That file is not on this desk any more.");
+      try {
+        const opened = await readFile(file.id, file.name, file.mime);
+        if (!opened) get().showToast("That file is not on this desk any more.");
+      } catch (error) {
+        get().showToast(error instanceof Error ? error.message : "That file could not be opened.");
+      }
     },
     setUserRole: (id, role) => {
       const actor = get().user;

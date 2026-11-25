@@ -477,6 +477,10 @@ export async function readFile(id: string, name: string, mime: string): Promise<
   const stored = await blobGet(id);
   if (!stored) return false;
   const plain = await decryptBlob(session.master, stored.iv, stored.data);
+  if (window.trueDesk?.openFile) {
+    await window.trueDesk.openFile(name, bytesToBase64(plain));
+    return true;
+  }
   const blob = new Blob([plain], { type: mime || "application/octet-stream" });
   const url = URL.createObjectURL(blob);
   const opened = window.open(url, "_blank", "noopener");
@@ -488,6 +492,16 @@ export async function readFile(id: string, name: string, mime: string): Promise<
   }
   window.setTimeout(() => URL.revokeObjectURL(url), 60000);
   return true;
+}
+
+function bytesToBase64(bytes: ArrayBuffer): string {
+  const view = new Uint8Array(bytes);
+  let binary = "";
+  const step = 0x8000;
+  for (let index = 0; index < view.length; index += step) {
+    binary += String.fromCharCode(...view.subarray(index, index + step));
+  }
+  return btoa(binary);
 }
 
 const RELEASE_TYPES: Record<string, string> = {

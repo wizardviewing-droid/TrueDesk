@@ -69,6 +69,18 @@ ipcMain.handle("open-outlook", async (_event, url) => {
   await shell.openExternal(url);
 });
 
+ipcMain.handle("open-file", async (_event, name, base64) => {
+  if (typeof name !== "string" || typeof base64 !== "string" || !base64) throw new Error("That file could not be opened.");
+  const raw = path.basename(name).replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_").trim().slice(0, 180);
+  const safe = raw || "attachment";
+  const dir = path.join(app.getPath("temp"), "TrueDesk");
+  await fs.promises.mkdir(dir, { recursive: true });
+  const dest = path.join(dir, `${Date.now()}-${safe}`);
+  await fs.promises.writeFile(dest, Buffer.from(base64, "base64"));
+  const error = await shell.openPath(dest);
+  if (error) throw new Error(error);
+});
+
 ipcMain.handle("read-spreadsheets", async (_event, target) => {
   if (typeof target !== "string" || !target.trim() || target.length > 400) throw new Error("That path is not usable.");
   const resolved = path.resolve(target.trim());
