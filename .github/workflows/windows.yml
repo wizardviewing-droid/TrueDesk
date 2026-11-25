@@ -24,13 +24,17 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
         run: npm install && npx electron-builder --win nsis portable --x64 --publish never
+      - name: Zip the app
+        shell: pwsh
+        run: Compress-Archive -Force -Path desktop/release/TrueDesk.exe -DestinationPath desktop/release/TrueDesk.zip
       - name: Publish the download
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if gh release view v1.0.0 >/dev/null 2>&1; then
-            gh release upload v1.0.0 desktop/release/*.exe --clobber
+          notes="Windows app for the accounts desk. Unzip TrueDesk.zip and open TrueDesk.exe."
+          if gh release view v1.0.1 >/dev/null 2>&1; then
+            gh release upload v1.0.1 desktop/release/TrueDesk.exe desktop/release/TrueDesk.zip --clobber
           else
-            gh release create v1.0.0 desktop/release/*.exe --title "True Desk" --notes "Windows app for the accounts desk. Open TrueDesk.exe. The first person to register is the manager."
+            gh release create v1.0.1 desktop/release/TrueDesk.exe desktop/release/TrueDesk.zip --title "True Desk" --notes "$notes"
           fi

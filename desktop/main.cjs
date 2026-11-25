@@ -1,12 +1,11 @@
-const { app, BrowserWindow, ipcMain, shell } = require("electron");
-const { spawn } = require("child_process");
+const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const fs = require("fs");
 const http = require("http");
 const path = require("path");
+const { pathToFileURL } = require("url");
 
 const PORT = 4173;
 const SHEET = /\.(xlsx|xlsm|xlsb|xls|csv)$/i;
-let server;
 
 function serverEntry() {
   const packed = path.join(process.resourcesPath, "app-server", "server", "index.mjs");
@@ -14,20 +13,14 @@ function serverEntry() {
   return fs.existsSync(packed) ? packed : local;
 }
 
-function startServer() {
+async function startServer() {
   const entry = serverEntry();
-  server = spawn(process.execPath, [entry], {
-    env: {
-      ...process.env,
-      ELECTRON_RUN_AS_NODE: "1",
-      HOST: "127.0.0.1",
-      PORT: String(PORT),
-      NITRO_HOST: "127.0.0.1",
-      NITRO_PORT: String(PORT),
-    },
-    cwd: path.dirname(entry),
-    stdio: "pipe",
-  });
+  if (!fs.existsSync(entry)) throw new Error("The desk files were not packed with this app.");
+  process.env.HOST = "127.0.0.1";
+  process.env.PORT = String(PORT);
+  process.env.NITRO_HOST = "127.0.0.1";
+  process.env.NITRO_PORT = String(PORT);
+  await import(pathToFileURL(entry).href);
 }
 
 function waitForDesk() {
@@ -99,12 +92,16 @@ ipcMain.handle("read-spreadsheets", async (_event, target) => {
 });
 
 app.whenReady().then(async () => {
-  startServer();
-  await waitForDesk();
-  createWindow();
+  try {
+    await startServer();
+    await waitForDesk();
+    createWindow();
+  } catch (error) {
+    dialog.showErrorBox("True Desk could not start", error instanceof Error ? error.message : String(error));
+    app.quit();
+  }
 });
 
 app.on("window-all-closed", () => {
-  if (server) server.kill();
   app.quit();
 });
