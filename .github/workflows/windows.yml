@@ -46,8 +46,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           notes="Windows app for the accounts desk. Unzip TrueDesk.zip and open TrueDesk.exe."
-          if gh release view v1.0.3 >/dev/null 2>&1; then
-            gh release upload v1.0.3 desktop/release/TrueDesk.exe desktop/release/TrueDesk.zip --clobber
+          if gh release view v1.0.4 >/dev/null 2>&1; then
+            gh release upload v1.0.4 desktop/release/TrueDesk.exe desktop/release/TrueDesk.zip --clobber
           else
-            gh release create v1.0.3 desktop/release/TrueDesk.exe desktop/release/TrueDesk.zip --title "True Desk" --notes "$notes"
+            gh release create v1.0.4 desktop/release/TrueDesk.exe desktop/release/TrueDesk.zip --title "True Desk" --notes "$notes"
           fi

@@ -1,10 +1,11 @@
 import { format } from "date-fns";
-import { AlertTriangle, CalendarDays, Check, ChevronRight, CircleCheck, ClipboardList, Table, Users, Wrench } from "lucide-react";
+import { AlertTriangle, CalendarDays, ChevronRight, CircleCheck, ClipboardList, Paperclip, Table, Users, Wrench } from "lucide-react";
 import { useState } from "react";
+import { TaskActions } from "@/components/desk/task-actions";
 import { cx } from "@/lib/cx";
 import { parseISODate, todayISO } from "@/lib/desk/dates";
 import { matchesQuery, priorityRank, useDesk } from "@/lib/desk/store";
-import { repeatLabel, taskRepeat, type Priority, type Task } from "@/lib/desk/types";
+import { repeatLabel, taskRepeat, type Attachment, type Priority, type Task } from "@/lib/desk/types";
 
 type Lens = "all" | "open" | "overdue" | "done";
 
@@ -26,7 +27,7 @@ export function Dashboard() {
   const user = useDesk((s) => s.user);
   const query = useDesk((s) => s.query);
   const openTask = useDesk((s) => s.openTask);
-  const toggleDone = useDesk((s) => s.toggleDone);
+  const downloadAttachment = useDesk((s) => s.downloadAttachment);
   const acceptTask = useDesk((s) => s.acceptTask);
   const setView = useDesk((s) => s.setView);
   const [lens, setLens] = useState<Lens>("all");
@@ -88,6 +89,13 @@ export function Dashboard() {
                   <span className="text-sm text-muted">{repeatLabel(taskRepeat(task))}</span>
                 </button>
                 <button type="button" className="btn btn-gold" onClick={() => acceptTask(task.id)}>Accept</button>
+                {data.attachments.filter((file) => file.taskId === task.id).map((file) => (
+                  <button key={file.id} type="button" className="flex min-h-9 w-full items-center gap-2 rounded-md bg-paper px-2 text-left text-sm font-medium" onClick={() => void downloadAttachment(file.id)}>
+                    <Paperclip className="size-3.5" aria-hidden="true" />
+                    <span className="truncate">{file.name}</span>
+                    <span className="ml-auto text-xs text-muted">Open</span>
+                  </button>
+                ))}
               </li>
             ))}
           </ul>
@@ -95,9 +103,9 @@ export function Dashboard() {
       ) : null}
 
       {board === "mine" ? (
-        <TaskPanel title={yourTitle} tasks={mine.tasks} today={today} empty={lens === "done" ? "Finished work shows up here." : "Nothing on your desk."} onOpen={openTask} onDone={toggleDone} />
+        <TaskPanel title={yourTitle} tasks={mine.tasks} today={today} files={(id) => data.attachments.filter((file) => file.taskId === id)} empty={lens === "done" ? "Finished work shows up here." : "Nothing on your desk."} onOpen={openTask} onFile={(id) => void downloadAttachment(id)} />
       ) : (
-        <TaskPanel title={teamTitle} tasks={team.tasks} today={today} who={(id) => data.users.find((person) => person.id === id)?.name} empty={lens === "done" ? "No finished team work." : "Nothing on the team desk."} onOpen={openTask} onDone={user.role === "manager" ? toggleDone : undefined} />
+        <TaskPanel title={teamTitle} tasks={team.tasks} today={today} who={(id) => data.users.find((person) => person.id === id)?.name} files={(id) => data.attachments.filter((file) => file.taskId === id)} empty={lens === "done" ? "No finished team work." : "Nothing on the team desk."} onOpen={openTask} onFile={(id) => void downloadAttachment(id)} />
       )}
     </div>
   );
@@ -108,17 +116,19 @@ function TaskPanel({
   tasks,
   today,
   who,
+  files,
   empty,
   onOpen,
-  onDone,
+  onFile,
 }: {
   title: string;
   tasks: Task[];
   today: string;
   who?: (id: string) => string | undefined;
+  files: (id: string) => Attachment[];
   empty: string;
   onOpen: (id: string) => void;
-  onDone?: (id: string) => void;
+  onFile: (id: string) => void;
 }) {
   return (
     <section className="card overflow-hidden">
@@ -132,7 +142,7 @@ function TaskPanel({
       ) : (
         <ul>
           {tasks.map((task) => (
-            <TaskRow key={task.id} task={task} today={today} who={who?.(task.assigneeId)} done={task.status === "done"} onOpen={() => onOpen(task.id)} onDone={onDone && task.status !== "pending" ? () => onDone(task.id) : undefined} />
+            <TaskRow key={task.id} task={task} today={today} who={who?.(task.assigneeId)} files={files(task.id)} done={task.status === "done"} onOpen={() => onOpen(task.id)} onFile={onFile} />
           ))}
         </ul>
       )}
@@ -188,36 +198,44 @@ function priorityPill(priority: Priority) {
   return { label: "Normal", className: "bg-gold-soft text-navy" };
 }
 
-function TaskRow({ task, today, who, done, onOpen, onDone }: { task: Task; today: string; who?: string; done: boolean; onOpen: () => void; onDone?: () => void }) {
+function TaskRow({ task, today, who, files, done, onOpen, onFile }: { task: Task; today: string; who?: string; files: Attachment[]; done: boolean; onOpen: () => void; onFile: (id: string) => void }) {
   const pill = priorityPill(task.priority);
   const repeat = taskRepeat(task);
   const overdue = !done && Boolean(task.date && task.date < today);
   const waiting = task.status === "pending";
   return (
-    <li className="flex items-center gap-2 border-b border-line px-3 py-2 last:border-b-0">
-      {onDone ? (
-        <button type="button" className="grid size-11 shrink-0 place-items-center" aria-label={done ? `Reopen ${task.title}` : `Mark ${task.title} done`} onClick={onDone}>
-          <span className={cx("grid size-5 place-items-center rounded-sm border-2", done ? "border-sage bg-sage text-card" : "border-navy/30 bg-card text-navy")}>
-            {done ? <Check className="size-3" aria-hidden="true" /> : null}
+    <li className="border-b border-line px-3 py-3 last:border-b-0">
+      <div className="flex items-start gap-2">
+        <button type="button" className="min-w-0 flex-1 py-1 text-left" onClick={onOpen}>
+          <span className={cx("block font-semibold", done && "text-muted line-through")}>{task.title}</span>
+          <span className="mt-1 flex flex-wrap gap-1">
+            {who ? <span className="rounded-md bg-paper px-2 py-0.5 text-xs font-semibold text-navy">{who}</span> : null}
+            <span className={cx("rounded-md px-2 py-0.5 text-xs font-semibold", overdue ? "bg-coral-soft text-coral" : "bg-paper text-navy")}>
+              {task.date ? format(parseISODate(task.date), "d MMM") : "No date"}
+            </span>
+            {task.time ? <span className="rounded-md bg-paper px-2 py-0.5 text-xs font-semibold text-navy">{task.time}</span> : null}
+            <span className="rounded-md bg-paper px-2 py-0.5 text-xs font-semibold text-navy">{repeatLabel(repeat)}</span>
+            {files.length ? <span className="rounded-md bg-gold-soft px-2 py-0.5 text-xs font-semibold text-navy">{files.length} attached</span> : null}
           </span>
         </button>
-      ) : (
-        <span className="w-2 shrink-0" />
-      )}
-      <button type="button" className="min-w-0 flex-1 py-1 text-left" onClick={onOpen}>
-        <span className={cx("block font-semibold", done && "text-muted line-through")}>{task.title}</span>
-        <span className="mt-1 flex flex-wrap gap-1">
-          {who ? <span className="rounded-md bg-paper px-2 py-0.5 text-xs font-semibold text-navy">{who}</span> : null}
-          <span className={cx("rounded-md px-2 py-0.5 text-xs font-semibold", overdue ? "bg-coral-soft text-coral" : "bg-paper text-navy")}>
-            {task.date ? format(parseISODate(task.date), "d MMM") : "No date"}
-          </span>
-          {task.time ? <span className="rounded-md bg-paper px-2 py-0.5 text-xs font-semibold text-navy">{task.time}</span> : null}
-          <span className="rounded-md bg-paper px-2 py-0.5 text-xs font-semibold text-navy">{repeatLabel(repeat)}</span>
+        <span className={cx("shrink-0 rounded-md px-2 py-1 text-xs font-semibold", done ? "bg-sage-soft text-sage" : waiting ? "bg-gold-soft text-navy" : pill.className)}>
+          {done ? "Done" : waiting ? "To accept" : pill.label}
         </span>
-      </button>
-      <span className={cx("shrink-0 rounded-md px-2 py-1 text-xs font-semibold", done ? "bg-sage-soft text-sage" : waiting ? "bg-gold-soft text-navy" : pill.className)}>
-        {done ? "Done" : waiting ? "To accept" : pill.label}
-      </span>
+      </div>
+      {files.length ? (
+        <ul className="mt-2 grid gap-1">
+          {files.map((file) => (
+            <li key={file.id}>
+              <button type="button" className="flex min-h-9 w-full items-center gap-2 rounded-md bg-paper px-2 text-left text-sm font-medium text-navy" onClick={() => onFile(file.id)}>
+                <Paperclip className="size-3.5 shrink-0" aria-hidden="true" />
+                <span className="truncate">{file.name}</span>
+                <span className="ml-auto text-xs text-muted">Open</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <TaskActions taskId={task.id} />
     </li>
   );
 }

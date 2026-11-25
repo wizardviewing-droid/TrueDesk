@@ -472,18 +472,22 @@ export async function storeFile(file: File): Promise<{ id: string } | { error: s
   return { id };
 }
 
-export async function readFile(id: string, name: string, mime: string): Promise<void> {
-  if (!session) return;
+export async function readFile(id: string, name: string, mime: string): Promise<boolean> {
+  if (!session) return false;
   const stored = await blobGet(id);
-  if (!stored) return;
+  if (!stored) return false;
   const plain = await decryptBlob(session.master, stored.iv, stored.data);
   const blob = new Blob([plain], { type: mime || "application/octet-stream" });
   const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = name;
-  link.click();
-  URL.revokeObjectURL(url);
+  const opened = window.open(url, "_blank", "noopener");
+  if (!opened) {
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = name;
+    link.click();
+  }
+  window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+  return true;
 }
 
 const RELEASE_TYPES: Record<string, string> = {

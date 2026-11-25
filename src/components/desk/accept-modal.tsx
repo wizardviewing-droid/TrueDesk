@@ -10,6 +10,7 @@ export function AcceptModal() {
   const acceptTask = useDesk((s) => s.acceptTask);
   const declineTask = useDesk((s) => s.declineTask);
   const openTask = useDesk((s) => s.openTask);
+  const downloadAttachment = useDesk((s) => s.downloadAttachment);
   const [snoozed, setSnoozed] = useState<string[]>(() => {
     if (typeof sessionStorage === "undefined") return [];
     try {
@@ -55,6 +56,7 @@ export function AcceptModal() {
   if (!data || !user || !current) return null;
   const from = data.users.find((person) => person.id === current.assignerId);
   const note = data.notes.find((item) => item.taskId === current.id);
+  const files = data.attachments.filter((item) => item.taskId === current.id);
 
   return (
     <Dialog.Root open={open} onOpenChange={(next) => { if (!next) snooze(); else setOpen(true); }}>
@@ -75,6 +77,17 @@ export function AcceptModal() {
               {current.time ? ` at ${current.time}` : ""}
             </p>
             {note ? <p className="mt-3 text-sm">{note.body}</p> : null}
+            {files.length ? (
+              <ul className="mt-3 grid gap-1">
+                {files.map((file) => (
+                  <li key={file.id}>
+                    <button type="button" className="text-sm font-semibold text-navy underline" onClick={() => void downloadAttachment(file.id)}>
+                      Open {file.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </div>
           {waiting.length > 1 ? <p className="mt-3 text-sm text-muted">1 of {waiting.length} waiting</p> : null}
           {declining ? (
@@ -105,7 +118,7 @@ export function AcceptModal() {
               >
                 Accept
               </button>
-              <button type="button" className="btn btn-ghost" onClick={() => setDeclining(true)}>Decline</button>
+              <button type="button" className="btn btn-ghost" onClick={() => setDeclining(true)}>Reject</button>
               <button type="button" className="btn btn-quiet" onClick={() => { openTask(current.id); snooze(); }}>
                 Open first
               </button>

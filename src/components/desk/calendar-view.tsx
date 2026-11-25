@@ -2,6 +2,7 @@ import { format } from "date-fns";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cx } from "@/lib/cx";
+import { TaskActions } from "@/components/desk/task-actions";
 import { parseISODate, todayISO, toISODate } from "@/lib/desk/dates";
 import { matchesQuery, useDesk } from "@/lib/desk/store";
 
@@ -13,6 +14,7 @@ export function CalendarView() {
   const setScope = useDesk((s) => s.setScope);
   const moveTask = useDesk((s) => s.moveTask);
   const openTask = useDesk((s) => s.openTask);
+  const downloadAttachment = useDesk((s) => s.downloadAttachment);
   const createTask = useDesk((s) => s.createTask);
   const [cursor, setCursor] = useState(() => new Date());
   const [selected, setSelected] = useState(todayISO());
@@ -133,16 +135,27 @@ export function CalendarView() {
           <p className="px-4 py-8 text-sm text-muted">Nothing on this day. Drop a file on the date, or add a task.</p>
         ) : (
           <ul>
-            {selectedTasks.map((task) => (
-              <li key={task.id}>
-                <button type="button" className="w-full border-b border-line px-4 py-3 text-left last:border-b-0" onClick={() => openTask(task.id)}>
+            {selectedTasks.map((task) => {
+              const files = data.attachments.filter((file) => file.taskId === task.id);
+              return (
+              <li key={task.id} className="border-b border-line px-4 py-3 last:border-b-0">
+                <button type="button" className="w-full text-left" onClick={() => openTask(task.id)}>
                   <span className="block font-medium">{task.title}</span>
                   <span className="text-sm text-muted">
                     {task.time || "Any time"} · {data.users.find((person) => person.id === task.assigneeId)?.name}
+                    {files.length ? ` · ${files.length} attached` : ""}
                   </span>
                 </button>
+                {files.map((file) => (
+                  <button key={file.id} type="button" className="mt-2 flex min-h-9 w-full items-center gap-2 rounded-md bg-paper px-2 text-left text-sm font-medium" onClick={() => void downloadAttachment(file.id)}>
+                    {file.name}
+                    <span className="ml-auto text-xs text-muted">Open</span>
+                  </button>
+                ))}
+                <TaskActions taskId={task.id} />
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </section>

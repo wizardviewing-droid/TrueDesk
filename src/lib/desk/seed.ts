@@ -74,6 +74,7 @@ export function buildSeed(): DeskData {
       },
     ],
     activity: [],
+    notices: [],
   };
 }
 
@@ -87,6 +88,7 @@ export function withStandardTools(data: DeskData): DeskData {
   if (users.length && !users.some((user) => user.role === "manager")) {
     users = users.map((user, index) => (index === 0 ? { ...user, role: "manager" as const } : user));
   }
+  if (!data.notices) data.notices = [];
   const rolesChanged = users.some((user, index) => user !== data.users[index]);
   if (!extra.length && !rolesChanged) return data;
   return { ...data, users, tools: extra.length ? [...data.tools, ...extra] : data.tools };

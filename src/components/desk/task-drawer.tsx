@@ -2,14 +2,9 @@ import { format } from "date-fns";
 import { Paperclip, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { parseISODate } from "@/lib/desk/dates";
+import { TaskActions } from "@/components/desk/task-actions";
 import { useDesk } from "@/lib/desk/store";
 import { repeatLabel, taskRepeat, type Priority, type Repeat } from "@/lib/desk/types";
-
-function sizeLabel(size: number): string {
-  if (size < 1024) return `${size} B`;
-  if (size < 1048576) return `${Math.round(size / 1024)} KB`;
-  return `${(size / 1048576).toFixed(1)} MB`;
-}
 
 export function TaskDrawer() {
   const data = useDesk((s) => s.data);
@@ -19,14 +14,10 @@ export function TaskDrawer() {
   const updateTask = useDesk((s) => s.updateTask);
   const assignTask = useDesk((s) => s.assignTask);
   const moveTask = useDesk((s) => s.moveTask);
-  const moveOn = useDesk((s) => s.moveOn);
-  const toggleDone = useDesk((s) => s.toggleDone);
   const addNote = useDesk((s) => s.addNote);
-  const removeTask = useDesk((s) => s.removeTask);
   const downloadAttachment = useDesk((s) => s.downloadAttachment);
   const attachFiles = useDesk((s) => s.attachFiles);
   const [note, setNote] = useState("");
-  const [confirming, setConfirming] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   if (!data || !user || !editorId) return null;
   const task = data.tasks.find((item) => item.id === editorId);
@@ -37,9 +28,7 @@ export function TaskDrawer() {
   const hint =
     task.assigneeId === user.id
       ? "This sits on your own desk."
-      : user.role === "manager"
-        ? `${assignee?.name ?? "They"} get it straight away. A manager does not need acceptance.`
-        : `${assignee?.name ?? "They"} will be asked to accept it.`;
+      : `${assignee?.name ?? "They"} will be asked to accept it. If they reject it, it comes back to you.`;
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end bg-navy/35" onClick={() => openTask(null)}>
@@ -99,14 +88,7 @@ export function TaskDrawer() {
             <span className="mt-2 block text-sm text-muted">{hint}</span>
           </label>
           {task.returnNote ? <p className="rounded-md bg-paper px-3 py-2 text-sm text-navy">Returned: {task.returnNote}</p> : null}
-          <div className="flex flex-wrap gap-2">
-            <button type="button" className="btn btn-navy" onClick={() => moveOn(task.id)}>Move on</button>
-            {task.status !== "pending" ? (
-              <button type="button" className="btn btn-ghost" onClick={() => toggleDone(task.id)}>
-                {task.status === "done" ? "Reopen" : "Mark done"}
-              </button>
-            ) : null}
-          </div>
+          <TaskActions taskId={task.id} />
           <section>
             <h3 className="label">Notes</h3>
             <ul className="grid gap-2">
@@ -157,7 +139,7 @@ export function TaskDrawer() {
                   <li key={file.id}>
                     <button type="button" className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md border border-line px-3 text-left" onClick={() => void downloadAttachment(file.id)}>
                       <span className="truncate font-medium">{file.name}</span>
-                      <span className="shrink-0 text-sm text-muted">{sizeLabel(file.size)}</span>
+                      <span className="shrink-0 text-sm font-semibold text-navy">Open</span>
                     </button>
                   </li>
                 ))}
@@ -165,14 +147,6 @@ export function TaskDrawer() {
             )}
           </section>
           <p className="text-xs text-muted">Opened {task.date ? format(parseISODate(task.date), "d MMMM yyyy") : "without a date"}.</p>
-          {confirming ? (
-            <div className="flex gap-2">
-              <button type="button" className="btn btn-navy" onClick={() => { removeTask(task.id); setConfirming(false); }}>Remove task</button>
-              <button type="button" className="btn btn-ghost" onClick={() => setConfirming(false)}>Keep it</button>
-            </div>
-          ) : (
-            <button type="button" className="btn btn-quiet justify-self-start text-danger" onClick={() => setConfirming(true)}>Remove task</button>
-          )}
         </div>
       </aside>
     </div>

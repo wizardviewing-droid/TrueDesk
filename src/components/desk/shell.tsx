@@ -61,6 +61,8 @@ export function Shell() {
   const createTask = useDesk((s) => s.createTask);
   const addFilesAsTasks = useDesk((s) => s.addFilesAsTasks);
   const attachFiles = useDesk((s) => s.attachFiles);
+  const openTask = useDesk((s) => s.openTask);
+  const dismissNotice = useDesk((s) => s.dismissNotice);
   const link = useDesk((s) => s.link);
   const downloadExcel = useDesk((s) => s.downloadExcel);
   const downloadVault = useDesk((s) => s.downloadVault);
@@ -90,6 +92,7 @@ export function Shell() {
     (task) => task.assigneeId === user.id && task.status !== "done" && task.status !== "pending" && task.date && task.date <= today,
   ).length;
   const pending = data.tasks.filter((task) => task.assigneeId === user.id && task.status === "pending").length;
+  const unread = (data.notices ?? []).filter((notice) => notice.userId === user.id && !notice.read);
 
   return (
     <div
@@ -117,8 +120,10 @@ export function Shell() {
         const target = event.target as HTMLElement | null;
         const taskId = target?.closest("[data-drop-task]")?.getAttribute("data-drop-task");
         const date = target?.closest("[data-drop-date]")?.getAttribute("data-drop-date");
-        if (taskId) void attachFiles(taskId, files);
-        else void addFilesAsTasks(files, date || undefined);
+        if (taskId) {
+          void attachFiles(taskId, files);
+          openTask(taskId);
+        } else void addFilesAsTasks(files, date || undefined);
       }}
     >
       <aside className={cx("fixed inset-y-0 left-0 z-30 flex w-72 flex-col bg-navy text-paper md:static md:translate-x-0", menu ? "translate-x-0" : "-translate-x-full md:translate-x-0")}>
@@ -174,10 +179,10 @@ export function Shell() {
             <Save className="size-4" aria-hidden="true" />
             Save
           </button>
-          {pending ? (
+          {pending || unread.length ? (
             <button type="button" className="btn btn-navy" onClick={() => window.dispatchEvent(new Event("truedesk-wake"))}>
               <Bell className="size-4" aria-hidden="true" />
-              {pending}
+              {pending + unread.length}
             </button>
           ) : null}
           <button type="button" className="btn btn-gold" onClick={() => createTask({ title: "New task" })}>
@@ -195,6 +200,17 @@ export function Shell() {
             </button>
           </div>
         ) : null}
+        {unread.map((notice) => (
+          <div key={notice.id} className="flex flex-wrap items-center justify-between gap-3 bg-coral-soft px-4 py-3 text-navy">
+            <p className="font-semibold">{notice.message}</p>
+            <span className="flex gap-2">
+              {notice.taskId ? (
+                <button type="button" className="btn btn-navy" onClick={() => openTask(notice.taskId ?? null)}>Open task</button>
+              ) : null}
+              <button type="button" className="btn btn-ghost" onClick={() => dismissNotice(notice.id)}>OK</button>
+            </span>
+          </div>
+        ))}
         <main className="min-h-0 flex-1 overflow-auto px-4 py-5 md:px-6">
           {view === "today" ? <Dashboard /> : null}
           {view === "calendar" ? <CalendarView /> : null}

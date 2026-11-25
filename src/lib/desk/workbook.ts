@@ -6,6 +6,7 @@ import type {
   DeskData,
   DeskTool,
   Note,
+  Notice,
   Priority,
   Role,
   Task,
@@ -120,6 +121,19 @@ export function buildWorkbook(data: DeskData): Uint8Array {
       taskId: item.taskId ?? "",
     })),
     ["id", "at", "actorId", "message", "taskId"],
+  );
+  addSheet(
+    wb,
+    "Notices",
+    (data.notices ?? []).map((item) => ({
+      id: item.id,
+      userId: item.userId,
+      taskId: item.taskId ?? "",
+      message: item.message,
+      at: item.at,
+      read: item.read ? "yes" : "",
+    })),
+    ["id", "userId", "taskId", "message", "at", "read"],
   );
   addSheet(
     wb,
@@ -244,5 +258,16 @@ export function parseWorkbook(bytes: ArrayBuffer | Uint8Array): DeskData {
     }))
     .filter((item) => item.id && item.message);
 
-  return { users, tasks, notes, attachments, tools, activity };
+  const notices: Notice[] = sheetRows(wb, "Notices")
+    .map((row) => ({
+      id: text(row.id),
+      userId: text(row.userId),
+      taskId: text(row.taskId) || undefined,
+      message: text(row.message),
+      at: text(row.at),
+      read: text(row.read) === "yes",
+    }))
+    .filter((item) => item.id && item.userId && item.message);
+
+  return { users, tasks, notes, attachments, tools, activity, notices };
 }

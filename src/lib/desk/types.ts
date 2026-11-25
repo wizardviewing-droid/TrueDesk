@@ -109,6 +109,15 @@ export type Activity = {
   taskId?: string;
 };
 
+export type Notice = {
+  id: string;
+  userId: string;
+  taskId?: string;
+  message: string;
+  at: string;
+  read: boolean;
+};
+
 export type DeskData = {
   users: User[];
   tasks: Task[];
@@ -116,6 +125,7 @@ export type DeskData = {
   attachments: Attachment[];
   tools: DeskTool[];
   activity: Activity[];
+  notices: Notice[];
 };
 
 export function statusLabel(status: TaskStatus): string {

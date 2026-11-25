@@ -93,6 +93,7 @@ type State = {
   toggleDone: (id: string) => void;
   acceptTask: (id: string) => void;
   declineTask: (id: string, reason: string) => void;
+  dismissNotice: (id: string) => void;
   removeTask: (id: string) => void;
   addNote: (taskId: string, body: string) => void;
   attachFiles: (taskId: string, files: File[], quiet?: boolean) => Promise<void>;
@@ -178,8 +179,10 @@ function edit(mutator: (data: DeskData) => void) {
   const current = api().data;
   if (!current) return;
   const data = structuredClone(current);
+  if (!data.notices) data.notices = [];
   mutator(data);
   data.activity = data.activity.slice(0, 200);
+  data.notices = data.notices.slice(0, 100);
   useDesk.setState({ data, phase: "dirty" });
   schedule();
 }
@@ -320,7 +323,7 @@ export const useDesk = create<State>((set, get) => {
       if (!user) return null;
       const now = new Date().toISOString();
       const assigneeId = partial.assigneeId || user.id;
-      const manager = user.role === "manager" && assigneeId !== user.id;
+      const manager = false;
       const id = crypto.randomUUID();
       const task: Task = {
         id,
@@ -383,11 +386,6 @@ export const useDesk = create<State>((set, get) => {
           task.managerAssigned = false;
           log(data, user.id, `${user.name} kept “${task.title}” on their own desk.`, id);
           toast = "Kept on your desk.";
-        } else if (user.role === "manager") {
-          task.status = "accepted";
-          task.managerAssigned = true;
-          log(data, user.id, `${user.name} put “${task.title}” on ${assignee.name}'s desk.`, id);
-          toast = `${assignee.name} has it. No acceptance needed.`;
         } else {
           task.status = "pending";
           task.managerAssigned = false;
@@ -421,7 +419,7 @@ export const useDesk = create<State>((set, get) => {
       let toast = "";
       edit((data) => {
         const task = taskById(data, id);
-        if (!task || task.status === "pending") return;
+        if (!task) return;
         const now = new Date().toISOString();
         const repeat = taskRepeat(task);
         if (task.status !== "done" && repeat !== "once") {
@@ -471,9 +469,10 @@ export const useDesk = create<State>((set, get) => {
       edit((data) => {
         const task = taskById(data, id);
         if (!task) return;
+        const backTo = task.assignerId;
         const note = reason.trim() || "No reason given.";
         task.returnNote = note;
-        task.assigneeId = task.assignerId;
+        task.assigneeId = backTo;
         task.status = "accepted";
         task.managerAssigned = false;
         task.updatedAt = new Date().toISOString();
@@ -484,9 +483,23 @@ export const useDesk = create<State>((set, get) => {
           body: `Declined: ${note}`,
           createdAt: new Date().toISOString(),
         });
-        log(data, user.id, `${user.name} declined “${task.title}”.`, id);
+        data.notices.unshift({
+          id: crypto.randomUUID(),
+          userId: backTo,
+          taskId: id,
+          message: `${user.name} rejected “${task.title}”. It is back on your desk.`,
+          at: new Date().toISOString(),
+          read: false,
+        });
+        log(data, user.id, `${user.name} rejected “${task.title}”.`, id);
       });
       get().showToast("Sent back.");
+    },
+    dismissNotice: (id) => {
+      edit((data) => {
+        const notice = data.notices.find((item) => item.id === id);
+        if (notice) notice.read = true;
+      });
     },
     removeTask: (id) => {
       const user = get().user;
@@ -572,22 +585,15 @@ export const useDesk = create<State>((set, get) => {
       const assignee = get().data?.users.find((item) => item.id === assigneeId);
       const other = assigneeId !== user.id;
       const who = assignee?.name;
-      const desk = who ? `${who}'s desk` : "their desk";
-      if (files.length === 1 && first && !other) set({ editorId: first });
-      else if (other) {
-        get().showToast(
-          user.role === "manager"
-            ? files.length === 1
-              ? `On ${desk}.`
-              : `${files.length} tasks on ${desk}.`
-            : `Sent to ${who ?? "them"} to accept.`,
-        );
-      } else get().showToast(`${files.length} tasks added from files.`);
+      if (first) set({ editorId: first });
+      if (other) get().showToast(`Sent to ${who ?? "them"} to accept.`);
+      else if (files.length > 1) get().showToast(`${files.length} tasks added from files.`);
     },
     downloadAttachment: async (id) => {
       const file = get().data?.attachments.find((item) => item.id === id);
       if (!file) return;
-      await readFile(file.id, file.name, file.mime);
+      const opened = await readFile(file.id, file.name, file.mime);
+      if (!opened) get().showToast("That file is not on this desk any more.");
     },
     setUserRole: (id, role) => {
       const actor = get().user;
