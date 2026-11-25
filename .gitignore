@@ -2,7 +2,7 @@ node_modules
 .output
 dist
 desktop/node_modules
-desktop/release
+desktop/packed
 .grok
 artifacts
 attachments

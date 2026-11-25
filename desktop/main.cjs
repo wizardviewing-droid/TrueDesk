@@ -20,6 +20,7 @@ async function startServer() {
   process.env.PORT = String(PORT);
   process.env.NITRO_HOST = "127.0.0.1";
   process.env.NITRO_PORT = String(PORT);
+  process.chdir(path.dirname(entry));
   await import(pathToFileURL(entry).href);
 }
 

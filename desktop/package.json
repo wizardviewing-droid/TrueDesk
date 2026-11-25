@@ -1,6 +1,6 @@
 {
   "name": "true-desk",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "main": "main.cjs",
   "description": "True Solicitors accounts desk",
@@ -25,7 +25,7 @@
     ],
     "extraResources": [
       {
-        "from": "../.output",
+        "from": "packed",
         "to": "app-server"
       }
     ],
