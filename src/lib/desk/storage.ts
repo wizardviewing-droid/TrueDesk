@@ -10,7 +10,7 @@ import {
   wrapMaster,
   type Wrap,
 } from "@/lib/desk/crypto";
-import { buildSeed, OFFICE_CODE, PILOT_PASSWORD } from "@/lib/desk/seed";
+import { buildSeed, OFFICE_CODE } from "@/lib/desk/seed";
 import type { DeskData, Role, User } from "@/lib/desk/types";
 import { VAULT_FILE } from "@/lib/desk/types";
 import { APP_VERSION, isNewerVersion } from "@/lib/desk/version";
@@ -287,7 +287,6 @@ async function seedVault() {
   const data = buildSeed();
   const master = await createMaster();
   const wraps: Record<string, Wrap> = {};
-  for (const user of data.users) wraps[user.username] = await wrapMaster(master, PILOT_PASSWORD);
   wraps.__office__ = await wrapMaster(master, OFFICE_CODE);
   session = { master, wraps };
   const json = await seal(data);
@@ -318,7 +317,7 @@ export async function unlock(username: string, password: string): Promise<Unlock
     await remember(user, master);
     return { user, data };
   } catch {
-    return { error: "The register could not be read. Reset the pilot copy if this keeps happening." };
+    return { error: "The register could not be read. Reset the desk if this keeps happening." };
   }
 }
 

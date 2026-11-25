@@ -1,27 +1,18 @@
 import { useState } from "react";
 import { TrueMark } from "@/components/logo";
-import { OFFICE_CODE, PILOT_PASSWORD } from "@/lib/desk/seed";
+import { OFFICE_CODE } from "@/lib/desk/seed";
 import { PATHS } from "@/lib/desk/types";
 import { useDesk } from "@/lib/desk/store";
-
-const PILOTS = [
-  { username: "s.ward", name: "Sophie Ward", job: "Accounts manager, can assign without acceptance" },
-  { username: "j.okonkwo", name: "James Okonkwo", job: "Accounts, has a task waiting" },
-  { username: "p.shah", name: "Priya Shah", job: "Accounts, has a task waiting" },
-  { username: "d.brooks", name: "Daniel Brooks", job: "Accounts, has a task waiting" },
-];
 
 export function SignIn() {
   const signIn = useDesk((s) => s.signIn);
   const register = useDesk((s) => s.register);
-  const reset = useDesk((s) => s.reset);
-  const [mode, setMode] = useState<"in" | "up">("in");
-  const [username, setUsername] = useState("j.okonkwo");
+  const [mode, setMode] = useState<"in" | "up">("up");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [job, setJob] = useState("Accounts");
-  const [team, setTeam] = useState("Accounts");
-  const [office, setOffice] = useState(OFFICE_CODE);
+  const [job, setJob] = useState("");
+  const [team, setTeam] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -37,7 +28,7 @@ export function SignIn() {
     event.preventDefault();
     setBusy(true);
     setError("");
-    const message = await register({ name, username, password, officeCode: office, job, team });
+    const message = await register({ name, username, password, officeCode: OFFICE_CODE, job, team });
     setError(message ?? "");
     setBusy(false);
   }
@@ -123,52 +114,12 @@ export function SignIn() {
                   <input className="input" value={team} onChange={(event) => setTeam(event.target.value)} />
                 </label>
               </div>
-              <label>
-                <span className="label">Office code</span>
-                <input className="input" value={office} onChange={(event) => setOffice(event.target.value)} />
-              </label>
               {error ? <p className="text-sm text-danger">{error}</p> : null}
               <button className="btn btn-gold" type="submit" disabled={busy}>
                 {busy ? "Adding you…" : "Create my desk"}
               </button>
             </form>
           )}
-          <div className="mt-8">
-            <p className="label">Pilot desks</p>
-            <p className="mb-3 text-sm text-muted">Password for each pilot desk: {PILOT_PASSWORD}</p>
-            <div className="grid gap-2">
-              {PILOTS.map((pilot) => (
-                <button
-                  key={pilot.username}
-                  type="button"
-                  className="card flex min-h-11 items-center justify-between gap-3 px-3 py-2 text-left"
-                  disabled={busy}
-                  onClick={() => {
-                    setUsername(pilot.username);
-                    setPassword(PILOT_PASSWORD);
-                    void enter(pilot.username, PILOT_PASSWORD);
-                  }}
-                >
-                  <span>
-                    <span className="block font-semibold">{pilot.name}</span>
-                    <span className="block text-sm text-muted">{pilot.job}</span>
-                  </span>
-                  <span className="text-sm text-muted">{pilot.username}</span>
-                </button>
-              ))}
-            </div>
-            <button
-              type="button"
-              className="btn btn-quiet mt-3"
-              onClick={() => {
-                if (window.confirm("Reset the pilot register? Tasks you have added on this desk will be cleared.")) {
-                  void reset();
-                }
-              }}
-            >
-              Reset the pilot register
-            </button>
-          </div>
         </div>
       </section>
     </main>

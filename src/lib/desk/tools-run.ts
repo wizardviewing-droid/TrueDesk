@@ -84,12 +84,12 @@ export function limitationFor(accidentISO: string, dobISO: string | null, today 
 }
 
 const SAMPLE_TIME: Record<string, string>[] = [
-  { Date: "02/11/2026", "Fee earner": "James Okonkwo", Matter: "PI-20418", Hours: "1.5", Rate: "220" },
-  { Date: "03/11/2026", "Fee earner": "James Okonkwo", Matter: "PI-18802", Hours: "0.8", Rate: "220" },
-  { Date: "03/11/2026", "Fee earner": "Priya Shah", Matter: "HD-3310", Hours: "2.2", Rate: "210" },
-  { Date: "04/11/2026", "Fee earner": "Sophie Ward", Matter: "PI-17660", Hours: "0.6", Rate: "310" },
-  { Date: "04/11/2026", "Fee earner": "Priya Shah", Matter: "HD-3310", Hours: "1.1", Rate: "210" },
-  { Date: "05/11/2026", "Fee earner": "Daniel Brooks", Matter: "CONV-8891", Hours: "1.4", Rate: "120" },
+  { Date: "02/11/2026", "Fee earner": "Fee earner 1", Matter: "10001", Hours: "1.5", Rate: "220" },
+  { Date: "03/11/2026", "Fee earner": "Fee earner 1", Matter: "10002", Hours: "0.8", Rate: "220" },
+  { Date: "03/11/2026", "Fee earner": "Fee earner 2", Matter: "10003", Hours: "2.2", Rate: "210" },
+  { Date: "04/11/2026", "Fee earner": "Fee earner 2", Matter: "10001", Hours: "0.6", Rate: "310" },
+  { Date: "04/11/2026", "Fee earner": "Fee earner 2", Matter: "10003", Hours: "1.1", Rate: "210" },
+  { Date: "05/11/2026", "Fee earner": "Fee earner 3", Matter: "10004", Hours: "1.4", Rate: "120" },
 ];
 
 const SAMPLE_DISB: Record<string, string>[] = [

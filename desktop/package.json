@@ -1,6 +1,6 @@
 {
   "name": "true-desk",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
   "main": "main.cjs",
   "description": "True Solicitors accounts desk",
@@ -12,7 +12,7 @@
     "electron-builder": "25.1.8"
   },
   "build": {
-    "appId": "com.truesolicitors.desk",
+    "appId": "com.truesolicitors.truedesk",
     "productName": "True Desk",
     "executableName": "TrueDesk",
     "asar": true,
