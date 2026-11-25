@@ -18,7 +18,7 @@ jobs:
           node-version: 22
           cache: npm
       - name: Build the desk
-        run: npm ci && npm run build
+        run: npm ci && node scripts/with-app-env.mjs node ./node_modules/vite/bin/vite.js build && npm run db:migrate
       - name: Package the Windows app
         working-directory: desktop
         env:
