@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { Paperclip, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { parseISODate } from "@/lib/desk/dates";
 import { TaskActions } from "@/components/desk/task-actions";
 import { useDesk } from "@/lib/desk/store";
@@ -17,16 +17,21 @@ export function TaskDrawer() {
   const addNote = useDesk((s) => s.addNote);
   const downloadAttachment = useDesk((s) => s.downloadAttachment);
   const attachFiles = useDesk((s) => s.attachFiles);
+  const task = data?.tasks.find((item) => item.id === editorId);
   const [note, setNote] = useState("");
+  const [choice, setChoice] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
-  if (!data || !user || !editorId) return null;
-  const task = data.tasks.find((item) => item.id === editorId);
-  if (!task) return null;
+  useEffect(() => {
+    if (task) setChoice(task.assigneeId);
+  }, [task?.assigneeId]);
+  if (!data || !user || !editorId || !task) return null;
   const notes = data.notes.filter((item) => item.taskId === task.id);
   const files = data.attachments.filter((item) => item.taskId === task.id);
-  const assignee = data.users.find((item) => item.id === task.assigneeId);
-  const hint =
-    task.assigneeId === user.id
+  const assignee = data.users.find((item) => item.id === (choice || task.assigneeId));
+  const moving = choice !== "" && choice !== task.assigneeId;
+  const hint = moving
+    ? `Press confirm before this moves to ${assignee?.name ?? "them"}.`
+    : task.assigneeId === user.id
       ? "This sits on your own desk."
       : user.role === "manager"
         ? `${assignee?.name ?? "They"} will be told it is on their desk. They cannot send it back.`
@@ -82,12 +87,18 @@ export function TaskDrawer() {
           </div>
           <label>
             <span className="label">Assign to</span>
-            <select className="input" value={task.assigneeId} onChange={(event) => assignTask(task.id, event.target.value)}>
+            <select className="input" value={choice || task.assigneeId} onChange={(event) => setChoice(event.target.value)}>
               {data.users.map((person) => (
                 <option key={person.id} value={person.id}>{person.name}</option>
               ))}
             </select>
             <span className="mt-2 block text-sm text-muted">{hint}</span>
+            {moving ? (
+              <span className="mt-2 flex flex-wrap gap-2">
+                <button type="button" className="btn btn-gold px-3" onClick={() => assignTask(task.id, choice)}>Confirm</button>
+                <button type="button" className="btn btn-ghost px-3" onClick={() => setChoice(task.assigneeId)}>Cancel</button>
+              </span>
+            ) : null}
           </label>
           {task.returnNote ? <p className="rounded-md bg-paper px-3 py-2 text-sm text-navy">Returned: {task.returnNote}</p> : null}
           <TaskActions taskId={task.id} />

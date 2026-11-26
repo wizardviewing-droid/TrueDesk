@@ -75,7 +75,10 @@ type State = {
     repeat: Repeat;
     assigneeId: string;
   };
+  composing: boolean;
   setComposer: (patch: Partial<State["composer"]>) => void;
+  openCompose: (date?: string) => void;
+  closeCompose: () => void;
   boot: () => Promise<void>;
   signIn: (username: string, password: string) => Promise<string | null>;
   register: (input: {
@@ -271,7 +274,10 @@ export const useDesk = create<State>((set, get) => {
     toast: null,
     release: null,
     composer: { date: todayISO(), time: "", priority: "normal", repeat: "once", assigneeId: "" },
+    composing: false,
     setComposer: (patch) => set({ composer: { ...get().composer, ...patch } }),
+    openCompose: (date) => set({ composing: true, composer: { ...get().composer, date: date || todayISO() } }),
+    closeCompose: () => set({ composing: false }),
     boot: async () => {
       if (bootStarted) return;
       bootStarted = true;

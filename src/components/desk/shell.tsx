@@ -25,6 +25,7 @@ import { CalendarView } from "@/components/desk/calendar-view";
 import { Dashboard } from "@/components/desk/dashboard";
 import { PeopleView } from "@/components/desk/people-view";
 import { RegisterView } from "@/components/desk/register-view";
+import { NewTaskDialog } from "@/components/desk/new-task";
 import { TaskDrawer } from "@/components/desk/task-drawer";
 import { ToolsView } from "@/components/desk/tools-view";
 
@@ -56,7 +57,8 @@ export function Shell() {
   const inSync = useDesk((s) => s.inSync);
   const saveNow = useDesk((s) => s.saveNow);
   const signOut = useDesk((s) => s.signOut);
-  const createTask = useDesk((s) => s.createTask);
+  const openCompose = useDesk((s) => s.openCompose);
+  const composing = useDesk((s) => s.composing);
   const addFilesAsTasks = useDesk((s) => s.addFilesAsTasks);
   const attachFiles = useDesk((s) => s.attachFiles);
   const openTask = useDesk((s) => s.openTask);
@@ -181,7 +183,7 @@ export function Shell() {
               {pending + unread.length}
             </button>
           ) : null}
-          <button type="button" className="btn btn-gold" onClick={() => createTask({ title: "New task" })}>
+          <button type="button" className="btn btn-gold" onClick={() => openCompose()}>
             <Plus className="size-4" aria-hidden="true" />
             Add task
           </button>
@@ -221,6 +223,7 @@ export function Shell() {
         </div>
       ) : null}
       <TaskDrawer />
+      {composing ? <NewTaskDialog /> : null}
       <AcceptModal />
       {toast ? <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-md bg-navy px-4 py-3 text-sm text-paper shadow-lg">{toast}</div> : null}
       {copies ? (

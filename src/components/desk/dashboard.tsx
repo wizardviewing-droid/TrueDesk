@@ -131,16 +131,15 @@ function TaskPanel({
   onFile: (id: string) => void;
 }) {
   return (
-    <section className="card overflow-hidden">
-      <div className="flex items-center gap-2 bg-navy px-4 py-3 text-paper">
-        <ClipboardList className="size-4" aria-hidden="true" />
-        <h2 className="font-semibold">{title}</h2>
-        <span className="ml-auto tabular-nums text-gold">{tasks.length}</span>
+    <section>
+      <div className="mb-3 flex items-end justify-between gap-3 px-1">
+        <h2 className="text-lg font-semibold text-navy">{title}</h2>
+        <span className="text-sm font-semibold tabular-nums text-muted">{tasks.length}</span>
       </div>
       {tasks.length === 0 ? (
-        <p className="px-4 py-8 text-muted">{empty}</p>
+        <p className="card px-5 py-10 text-muted">{empty}</p>
       ) : (
-        <ul>
+        <ul className="grid gap-3">
           {tasks.map((task) => (
             <TaskRow key={task.id} task={task} today={today} who={who?.(task.assigneeId)} files={files(task.id)} done={task.status === "done"} onOpen={() => onOpen(task.id)} onFile={onFile} />
           ))}
@@ -203,27 +202,28 @@ function TaskRow({ task, today, who, files, done, onOpen, onFile }: { task: Task
   const repeat = taskRepeat(task);
   const overdue = !done && Boolean(task.date && task.date < today);
   const waiting = task.status === "pending";
+  const accent = done ? "border-l-sage" : overdue || task.priority === "high" ? "border-l-coral" : task.priority === "low" ? "border-l-sky" : "border-l-gold";
   return (
-    <li className="border-b border-line px-3 py-3 last:border-b-0">
-      <div className="flex items-start gap-2">
-        <button type="button" className="min-w-0 flex-1 py-1 text-left" onClick={onOpen}>
-          <span className={cx("block font-semibold", done && "text-muted line-through")}>{task.title}</span>
-          <span className="mt-1 flex flex-wrap gap-1">
-            {who ? <span className="rounded-md bg-paper px-2 py-0.5 text-xs font-semibold text-navy">{who}</span> : null}
-            <span className={cx("rounded-md px-2 py-0.5 text-xs font-semibold", overdue ? "bg-coral-soft text-coral" : "bg-paper text-navy")}>
-              {task.date ? format(parseISODate(task.date), "d MMM") : "No date"}
+    <li className={cx("card overflow-hidden border-l-4 shadow-sm", accent, done && "opacity-75")}>
+      <div className="flex items-start gap-4 px-4 py-4">
+        <button type="button" className="min-w-0 flex-1 text-left" onClick={onOpen}>
+          <span className={cx("block text-lg font-semibold text-navy", done && "text-muted line-through")}>{task.title}</span>
+          <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
+            <span className={cx(overdue && "font-semibold text-coral")}>
+              {task.date ? format(parseISODate(task.date), "EEE d MMM") : "No date"}
             </span>
-            {task.time ? <span className="rounded-md bg-paper px-2 py-0.5 text-xs font-semibold text-navy">{task.time}</span> : null}
-            <span className="rounded-md bg-paper px-2 py-0.5 text-xs font-semibold text-navy">{repeatLabel(repeat)}</span>
-            {files.length ? <span className="rounded-md bg-gold-soft px-2 py-0.5 text-xs font-semibold text-navy">{files.length} attached</span> : null}
+            {task.time ? <span>{task.time}</span> : null}
+            {who ? <span className="font-medium text-navy">{who}</span> : null}
+            {repeat !== "once" ? <span>{repeatLabel(repeat)}</span> : null}
+            {files.length ? <span>{files.length} file{files.length === 1 ? "" : "s"}</span> : null}
           </span>
         </button>
-        <span className={cx("shrink-0 rounded-md px-2 py-1 text-xs font-semibold", done ? "bg-sage-soft text-sage" : waiting ? "bg-gold-soft text-navy" : pill.className)}>
+        <span className={cx("shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold", done ? "bg-sage-soft text-sage" : waiting ? "bg-gold-soft text-navy" : pill.className)}>
           {done ? "Done" : waiting ? "To accept" : pill.label}
         </span>
       </div>
       {files.length ? (
-        <ul className="mt-2 grid gap-1">
+        <ul className="grid gap-1 px-4 pb-3">
           {files.map((file) => (
             <li key={file.id}>
               <button type="button" className="flex min-h-9 w-full items-center gap-2 rounded-md bg-paper px-2 text-left text-sm font-medium text-navy" onClick={() => onFile(file.id)}>
@@ -235,7 +235,9 @@ function TaskRow({ task, today, who, files, done, onOpen, onFile }: { task: Task
           ))}
         </ul>
       ) : null}
-      <TaskActions taskId={task.id} />
+      <div className="border-t border-line bg-paper/70 px-4 py-3">
+        <TaskActions taskId={task.id} />
+      </div>
     </li>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useDesk } from "@/lib/desk/store";
 
 export function TaskActions({ taskId }: { taskId: string }) {
@@ -10,11 +10,17 @@ export function TaskActions({ taskId }: { taskId: string }) {
   const assignTask = useDesk((s) => s.assignTask);
   const [confirming, setConfirming] = useState(false);
   const task = data?.tasks.find((item) => item.id === taskId);
+  const [choice, setChoice] = useState(task?.assigneeId ?? "");
+  useEffect(() => {
+    if (task) setChoice(task.assigneeId);
+  }, [task?.assigneeId]);
   if (!data || !user || !task) return null;
   const canDelete = user.role === "manager" || task.ownerId === user.id || task.assigneeId === user.id;
+  const moving = choice !== task.assigneeId;
+  const nextName = data.users.find((person) => person.id === choice)?.name ?? "them";
 
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-2" onClick={(event) => event.stopPropagation()}>
+    <div className="flex flex-wrap items-center gap-2" onClick={(event) => event.stopPropagation()}>
       <button type="button" className="btn btn-navy px-3" onClick={() => toggleDone(task.id)}>
         {task.status === "done" ? "Reopen" : "Done"}
       </button>
@@ -40,16 +46,22 @@ export function TaskActions({ taskId }: { taskId: string }) {
       </label>
       <label className="flex items-center gap-2 text-sm text-navy">
         <span className="font-semibold">Reallocate</span>
-        <select
-          className="input w-auto"
-          value={task.assigneeId}
-          onChange={(event) => assignTask(task.id, event.target.value)}
-        >
+        <select className="input w-auto" value={choice} onChange={(event) => setChoice(event.target.value)}>
           {data.users.map((person) => (
             <option key={person.id} value={person.id}>{person.name}</option>
           ))}
         </select>
       </label>
+      {moving ? (
+        <>
+          <button type="button" className="btn btn-gold px-3" onClick={() => assignTask(task.id, choice)}>
+            Confirm {nextName}
+          </button>
+          <button type="button" className="btn btn-quiet" onClick={() => setChoice(task.assigneeId)}>
+            Cancel
+          </button>
+        </>
+      ) : null}
     </div>
   );
 }

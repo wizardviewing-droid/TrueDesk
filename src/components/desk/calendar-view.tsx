@@ -15,7 +15,7 @@ export function CalendarView() {
   const moveTask = useDesk((s) => s.moveTask);
   const openTask = useDesk((s) => s.openTask);
   const downloadAttachment = useDesk((s) => s.downloadAttachment);
-  const createTask = useDesk((s) => s.createTask);
+  const openCompose = useDesk((s) => s.openCompose);
   const [cursor, setCursor] = useState(() => new Date());
   const [selected, setSelected] = useState(todayISO());
   const days = useMemo(() => {
@@ -126,7 +126,7 @@ export function CalendarView() {
       <section className="card h-fit overflow-hidden">
         <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
           <h2 className="font-semibold text-navy">{format(parseISODate(selected), "EEEE d MMMM")}</h2>
-          <button type="button" className="btn btn-gold" onClick={() => createTask({ date: selected, title: "New task" })}>
+          <button type="button" className="btn btn-gold" onClick={() => openCompose(selected)}>
             <Plus className="size-4" aria-hidden="true" />
             Add
           </button>
