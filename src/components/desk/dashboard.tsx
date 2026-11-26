@@ -140,7 +140,7 @@ function TaskPanel({
       {tasks.length === 0 ? (
         <p className="card px-5 py-10 text-muted">{empty}</p>
       ) : (
-        <ul className="grid gap-3">
+        <ul className="grid gap-2">
           {tasks.map((task, index) => (
             <TaskRow key={task.id} task={task} index={index} today={today} who={who?.(task.assigneeId)} files={files(task.id)} done={task.status === "done"} onOpen={() => onOpen(task.id)} onFile={onFile} />
           ))}
@@ -242,16 +242,16 @@ function TaskRow({ task, index, today, who, files, done, onOpen, onFile }: { tas
   const subtitle = task.matter || task.practice || who || "Accounts";
   const due = done ? "Done" : waiting ? "To accept" : overdue ? "Overdue" : dueToday ? "Due today" : task.date ? format(parseISODate(task.date), "d MMM") : "No date";
   return (
-    <li className={cx("relative overflow-hidden rounded-2xl border border-white shadow-sm", warm ? "bg-linear-to-r from-[#fff8e8] to-[#fff3d4]" : "bg-linear-to-r from-[#eef6ff] to-[#e4f1ff]", done && "opacity-75")}>
+    <li className={cx("relative overflow-hidden rounded-xl border border-white shadow-sm", warm ? "bg-linear-to-r from-[#fff8e8] to-[#fff3d4]" : "bg-linear-to-r from-[#eef6ff] to-[#e4f1ff]", done && "opacity-75")}>
       <span className={cx("absolute inset-y-0 left-0 w-1.5", done ? "bg-sage" : overdue ? "bg-coral" : warm ? "bg-gold" : "bg-sky")} />
-      <div className="flex items-center gap-4 px-5 py-4">
-        <button type="button" className="flex min-w-0 flex-1 items-center gap-4 text-left" onClick={onOpen}>
-          <span className="grid size-12 shrink-0 place-items-center rounded-full bg-card/80 text-navy shadow-sm">
-            {warm ? <Coins className="size-5" aria-hidden="true" /> : <ClipboardList className="size-5" aria-hidden="true" />}
+      <div className="flex flex-wrap items-center gap-3 py-2 pr-3 pl-4">
+        <button type="button" className="flex min-w-48 flex-1 items-center gap-3 text-left" onClick={onOpen}>
+          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-card/80 text-navy">
+            {warm ? <Coins className="size-4" aria-hidden="true" /> : <ClipboardList className="size-4" aria-hidden="true" />}
           </span>
           <span className="min-w-0">
-            <span className={cx("block truncate text-lg font-semibold text-navy", done && "text-muted line-through")}>{task.title}</span>
-            <span className="mt-0.5 block truncate text-sm text-muted">
+            <span className={cx("block truncate font-semibold text-navy", done && "text-muted line-through")}>{task.title}</span>
+            <span className="block truncate text-sm text-muted">
               {subtitle}
               {who ? ` · ${who}` : ""}
               {repeat !== "once" ? ` · ${repeatLabel(repeat)}` : ""}
@@ -259,16 +259,16 @@ function TaskRow({ task, index, today, who, files, done, onOpen, onFile }: { tas
             </span>
           </span>
         </button>
-        <span className={cx("relative shrink-0 rounded-full bg-card/80 px-3 py-1 text-sm font-semibold text-navy shadow-sm", overdue && "text-coral", done && "text-sage")}>
+        <span className={cx("shrink-0 rounded-full bg-[#d9e8f8] px-3 py-1 text-sm font-semibold text-navy", overdue && "bg-coral-soft text-coral", done && "bg-sage-soft text-sage", warm && !overdue && !done && "bg-[#f3e2a4]")}>
           {due}
         </span>
+        <TaskActions taskId={task.id} />
       </div>
-      <TaskArt warm={warm} />
       {files.length ? (
-        <ul className="grid gap-1 px-5 pb-3">
+        <ul className="grid gap-1 px-4 pb-2">
           {files.map((file) => (
             <li key={file.id}>
-              <button type="button" className="flex min-h-9 w-full items-center gap-2 rounded-full bg-card/70 px-3 text-left text-sm font-medium text-navy" onClick={() => onFile(file.id)}>
+              <button type="button" className="flex h-8 w-full items-center gap-2 rounded-lg bg-card/70 px-3 text-left text-sm font-medium text-navy" onClick={() => onFile(file.id)}>
                 <Paperclip className="size-3.5 shrink-0" aria-hidden="true" />
                 <span className="truncate">{file.name}</span>
                 <span className="ml-auto text-xs text-muted">Open</span>
@@ -277,29 +277,6 @@ function TaskRow({ task, index, today, who, files, done, onOpen, onFile }: { tas
           ))}
         </ul>
       ) : null}
-      <div className="border-t border-white/70 px-5 py-3">
-        <TaskActions taskId={task.id} />
-      </div>
     </li>
-  );
-}
-
-function TaskArt({ warm }: { warm: boolean }) {
-  const color = warm ? "#e3c36a" : "#9ec4ef";
-  return (
-    <svg className="pointer-events-none absolute top-3 right-28 hidden h-14 w-16 sm:block" viewBox="0 0 64 56" aria-hidden="true">
-      {warm ? (
-        <>
-          <ellipse cx="22" cy="34" rx="12" ry="7" fill="none" stroke={color} strokeWidth="2.5" />
-          <ellipse cx="40" cy="26" rx="12" ry="7" fill="none" stroke={color} strokeWidth="2.5" />
-          <ellipse cx="30" cy="18" rx="10" ry="6" fill="none" stroke={color} strokeWidth="2.5" />
-        </>
-      ) : (
-        <>
-          <rect x="16" y="8" width="28" height="38" rx="4" fill="none" stroke={color} strokeWidth="2.5" />
-          <path d="M22 20h16M22 28h12M22 36h10" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
-        </>
-      )}
-    </svg>
   );
 }
