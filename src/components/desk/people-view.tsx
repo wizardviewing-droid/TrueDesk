@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useDesk } from "@/lib/desk/store";
-import { roleLabel, type Role } from "@/lib/desk/types";
+import { PATHS, roleLabel, type Role } from "@/lib/desk/types";
 
 export function PeopleView() {
   const data = useDesk((s) => s.data);
   const user = useDesk((s) => s.user);
   const setUserRole = useDesk((s) => s.setUserRole);
   const addUser = useDesk((s) => s.addUser);
+  const removeUser = useDesk((s) => s.removeUser);
   const updateOwnPassword = useDesk((s) => s.updateOwnPassword);
   const showToast = useDesk((s) => s.showToast);
   const [name, setName] = useState("");
@@ -17,6 +18,8 @@ export function PeopleView() {
   const [team, setTeam] = useState(user?.team ?? "Accounts");
   const [nextPassword, setNextPassword] = useState("");
   const [error, setError] = useState("");
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState("");
   if (!data || !user) return null;
   const managers = data.users.filter((person) => person.role === "manager").length;
 
@@ -32,25 +35,48 @@ export function PeopleView() {
                 <div>
                   <p className="font-semibold">{person.name}{person.id === user.id ? " · You" : ""}</p>
                   <p className="text-sm text-muted">{person.job} · {person.team} · {person.username}</p>
+                  <p className="text-sm break-all text-muted">{PATHS.application}\{person.username}</p>
                   {waiting ? <p className="text-sm text-navy">{waiting} task{waiting === 1 ? "" : "s"} waiting for acceptance</p> : null}
                 </div>
                 {user.role === "manager" ? (
-                  <select
-                    className="input"
-                    value={person.role}
-                    aria-label={`Role for ${person.name}`}
-                    onChange={(event) => {
-                      const next = event.target.value as Role;
-                      if (person.role === "manager" && next !== "manager" && managers <= 1) {
-                        showToast("Keep at least one manager.");
-                        return;
-                      }
-                      setUserRole(person.id, next);
-                    }}
-                  >
-                    <option value="manager">Manager</option>
-                    <option value="user">Normal user</option>
-                  </select>
+                  <div className="grid gap-2">
+                    <select
+                      className="input"
+                      value={person.role}
+                      aria-label={`Role for ${person.name}`}
+                      onChange={(event) => {
+                        const next = event.target.value as Role;
+                        if (person.role === "manager" && next !== "manager" && managers <= 1) {
+                          showToast("Keep at least one manager.");
+                          return;
+                        }
+                        setUserRole(person.id, next);
+                      }}
+                    >
+                      <option value="manager">Manager</option>
+                      <option value="user">Normal user</option>
+                    </select>
+                    {person.id !== user.id ? (
+                      confirmId === person.id ? (
+                        <button
+                          type="button"
+                          className="btn btn-ghost text-danger"
+                          onClick={() => {
+                            void removeUser(person.id).then((message) => {
+                              setDeleteError(message ?? "");
+                              if (!message) setConfirmId(null);
+                            });
+                          }}
+                        >
+                          Confirm delete
+                        </button>
+                      ) : (
+                        <button type="button" className="btn btn-ghost" onClick={() => { setConfirmId(person.id); setDeleteError(""); }}>
+                          Delete profile
+                        </button>
+                      )
+                    ) : null}
+                  </div>
                 ) : (
                   <p className="text-sm text-muted">{roleLabel(person.role)}</p>
                 )}
@@ -58,6 +84,7 @@ export function PeopleView() {
             );
           })}
         </ul>
+        {deleteError ? <p className="px-5 py-3 text-sm text-danger">{deleteError}</p> : null}
       </section>
       <div className="grid content-start gap-5">
         <form

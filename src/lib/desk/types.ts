@@ -25,6 +25,8 @@ export const PRACTICES = [
   "Internal",
 ] as const;
 
+export type DiskStatus = { application: boolean; backup: boolean };
+
 export const PATHS = {
   application: "Y:\\accounts\\Tools\\Task application",
   backup: "Y:\\accounts\\Task app backup",

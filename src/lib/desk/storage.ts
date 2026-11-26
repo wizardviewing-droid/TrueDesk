@@ -4,20 +4,19 @@ import {
   decryptBytes,
   encryptBlob,
   encryptBytes,
-  exportMaster,
-  importMaster,
+  fromB64,
+  toB64,
   unwrapMaster,
   wrapMaster,
   type Wrap,
 } from "@/lib/desk/crypto";
+import { deskDisk } from "@/lib/desk/disk";
 import { buildSeed, OFFICE_CODE } from "@/lib/desk/seed";
-import type { DeskData, Role, User } from "@/lib/desk/types";
-import { VAULT_FILE } from "@/lib/desk/types";
+import type { DeskData, DiskStatus, Role, User } from "@/lib/desk/types";
 import { APP_VERSION, isNewerVersion } from "@/lib/desk/version";
 import { buildWorkbook, parseWorkbook } from "@/lib/desk/workbook";
 
 export type Slot = "application" | "backup";
-type HandleKey = string;
 
 export type Envelope = {
   version: 1;
@@ -33,84 +32,18 @@ type Session = {
 };
 
 type StoredBlob = { iv: string; data: ArrayBuffer };
+type ProfileFile = {
+  username: string;
+  wrap: Wrap;
+};
 
-const LS_APP = "truedesk:application";
-const LS_BAK = "truedesk:backup";
-const SS_KEY = "truedesk-jwk";
-const SS_USER = "truedesk-user";
+const RESERVED_USERS = new Set(["update", "attachments"]);
+const handles = new Map<string, FileSystemDirectoryHandle>();
+const memoryBlobs = new Map<string, StoredBlob>();
 
-let dbPromise: Promise<IDBDatabase> | null = null;
 let session: Session | null = null;
 let latestJson = "";
 let lastSnapshot = "";
-
-function lsKey(slot: Slot): string {
-  return slot === "application" ? LS_APP : LS_BAK;
-}
-
-function openDb(): Promise<IDBDatabase> {
-  if (typeof indexedDB === "undefined") return Promise.reject(new Error("Storage is not available."));
-  if (!dbPromise) {
-    dbPromise = new Promise((resolve, reject) => {
-      const request = indexedDB.open("truedesk", 1);
-      request.onupgradeneeded = () => {
-        const db = request.result;
-        if (!db.objectStoreNames.contains("slots")) db.createObjectStore("slots");
-        if (!db.objectStoreNames.contains("blobs")) db.createObjectStore("blobs");
-        if (!db.objectStoreNames.contains("handles")) db.createObjectStore("handles");
-      };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-  }
-  return dbPromise;
-}
-
-function req<T>(request: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-function done(tx: IDBTransaction): Promise<void> {
-  return new Promise((resolve, reject) => {
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error);
-  });
-}
-
-async function slotGet(key: string): Promise<string | null> {
-  const db = await openDb();
-  const tx = db.transaction("slots", "readonly");
-  const value = await req(tx.objectStore("slots").get(key));
-  return typeof value === "string" ? value : null;
-}
-
-async function slotSet(key: string, value: string): Promise<void> {
-  const db = await openDb();
-  const tx = db.transaction("slots", "readwrite");
-  tx.objectStore("slots").put(value, key);
-  await done(tx);
-}
-
-async function handleGet(slot: HandleKey): Promise<FileSystemDirectoryHandle | null> {
-  const db = await openDb();
-  const tx = db.transaction("handles", "readonly");
-  const value = await req(tx.objectStore("handles").get(slot));
-  if (value && typeof value === "object" && "getFileHandle" in (value as FileSystemDirectoryHandle)) {
-    return value as FileSystemDirectoryHandle;
-  }
-  return null;
-}
-
-async function handleSet(slot: HandleKey, handle: FileSystemDirectoryHandle): Promise<void> {
-  const db = await openDb();
-  const tx = db.transaction("handles", "readwrite");
-  tx.objectStore("handles").put(handle, slot);
-  await done(tx);
-}
 
 function parseEnvelope(json: string | null): Envelope | null {
   if (!json) return null;
@@ -123,118 +56,93 @@ function parseEnvelope(json: string | null): Envelope | null {
   }
 }
 
-async function folderText(slot: Slot): Promise<string | null> {
-  const handle = await readableHandle(slot);
-  if (!handle) return null;
+function parseProfile(json: string | null): ProfileFile | null {
+  if (!json) return null;
   try {
-    const fileHandle = await handle.getFileHandle(VAULT_FILE);
-    const file = await fileHandle.getFile();
-    return await file.text();
+    const value = JSON.parse(json) as ProfileFile;
+    if (!value?.username || !value.wrap?.salt || !value.wrap.iv || !value.wrap.wrapped) return null;
+    return value;
   } catch {
     return null;
   }
 }
 
+function packBlob(stored: StoredBlob): string {
+  const iv = fromB64(stored.iv);
+  const body = new Uint8Array(stored.data);
+  const packed = new Uint8Array(iv.byteLength + body.byteLength);
+  packed.set(iv, 0);
+  packed.set(body, iv.byteLength);
+  return toB64(packed);
+}
+
+function unpackBlob(packed: string): StoredBlob | null {
+  const bytes = fromB64(packed);
+  if (bytes.byteLength <= 12) return null;
+  const iv = bytes.slice(0, 12);
+  const body = bytes.slice(12);
+  return { iv: toB64(iv), data: body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) };
+}
+
+async function handleGet(slot: string): Promise<FileSystemDirectoryHandle | null> {
+  return handles.get(slot) ?? null;
+}
+
+async function handleSet(slot: string, handle: FileSystemDirectoryHandle): Promise<void> {
+  handles.set(slot, handle);
+}
+
 async function readableHandle(slot: Slot): Promise<FileSystemDirectoryHandle | null> {
-  const handle = await handleGet(slot);
-  if (!handle) return null;
-  try {
-    const state = await handle.queryPermission?.({ mode: "readwrite" });
-    if (state === "granted") return handle;
-  } catch {
-    return null;
+  return handles.get(slot) ?? null;
+}
+
+export async function folderLinks(): Promise<DiskStatus> {
+  return deskDisk().status();
+}
+
+async function collect(): Promise<Envelope | null> {
+  return parseEnvelope(await deskDisk().readVault());
+}
+
+function savedMessage(status: DiskStatus): { inSync: boolean; message: string } {
+  if (status.application && status.backup) return { inSync: true, message: "Both copies match." };
+  if (!status.application && !status.backup) return { inSync: false, message: "The shared drive could not be updated." };
+  const missed = status.application ? "the backup folder" : "the application folder";
+  return { inSync: false, message: `Saved, but could not update ${missed}.` };
+}
+
+async function writeProfiles(data: DeskData): Promise<string | null> {
+  if (!session) return null;
+  for (const user of data.users) {
+    const wrap = session.wraps[user.username];
+    if (!wrap) continue;
+    const json = JSON.stringify({
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      role: user.role,
+      team: user.team,
+      job: user.job,
+      wrap,
+      savedAt: new Date().toISOString(),
+    });
+    const status = await deskDisk().writeProfile(user.username, json);
+    if (!status.application && !status.backup) return `${user.name}'s profile folder could not be saved.`;
   }
   return null;
 }
 
-export async function folderLinks(): Promise<{ application: boolean; backup: boolean }> {
-  const [application, backup] = await Promise.all([readableHandle("application"), readableHandle("backup")]);
-  return { application: Boolean(application), backup: Boolean(backup) };
-}
-
-async function collect(): Promise<Envelope | null> {
-  const blobs = [
-    localStorage.getItem(LS_APP),
-    localStorage.getItem(LS_BAK),
-    await slotGet("application"),
-    await slotGet("backup"),
-    await folderText("application"),
-    await folderText("backup"),
-  ];
-  const envelopes = blobs.map(parseEnvelope).filter((item): item is Envelope => Boolean(item));
-  if (!envelopes.length) return null;
-  envelopes.sort((a, b) => (a.savedAt < b.savedAt ? 1 : -1));
-  return envelopes[0] ?? null;
-}
-
 async function writeSinks(json: string, data: DeskData | null): Promise<{ inSync: boolean; message: string }> {
-  const problems: string[] = [];
-  try {
-    localStorage.setItem(LS_APP, json);
-    localStorage.setItem(LS_BAK, json);
-  } catch {
-    problems.push("the desk copy");
-  }
-  try {
-    await slotSet("application", json);
-    await slotSet("backup", json);
-  } catch {
-    problems.push("the backup copy");
-  }
-  for (const slot of ["application", "backup"] as const) {
-    const handle = await readableHandle(slot);
-    if (!handle) continue;
-    try {
-      await writeVaultFile(handle, json);
-      if (data) await writeAttachments(handle, data);
-    } catch {
-      problems.push(slot === "application" ? "Y:\\ application folder" : "Y:\\ backup folder");
-    }
-  }
+  const status = await deskDisk().writeVault(json);
   latestJson = json;
-  if (!problems.length) return { inSync: true, message: "Both copies match." };
-  return { inSync: false, message: `Saved, but could not update ${problems.join(" and ")}.` };
-}
-
-async function writeVaultFile(dir: FileSystemDirectoryHandle, json: string) {
-  const handle = await dir.getFileHandle(VAULT_FILE, { create: true });
-  const stream = await handle.createWritable();
-  await stream.write(json);
-  await stream.close();
-}
-
-async function writeAttachments(dir: FileSystemDirectoryHandle, data: DeskData) {
-  const folder = await dir.getDirectoryHandle("attachments", { create: true });
-  for (const file of data.attachments) {
-    const stored = await blobGet(file.id);
-    if (!stored) continue;
-    const iv = Uint8Array.from(atob(stored.iv), (char) => char.charCodeAt(0));
-    const body = new Uint8Array(stored.data);
-    const packed = new Uint8Array(iv.length + body.length);
-    packed.set(iv, 0);
-    packed.set(body, iv.length);
-    const handle = await folder.getFileHandle(`${file.id}.bin`, { create: true });
-    const stream = await handle.createWritable();
-    await stream.write(new Blob([packed]));
-    await stream.close();
+  const report = savedMessage(status);
+  if (!report.inSync && !status.application && !status.backup) return report;
+  if (data) {
+    const profileError = await writeProfiles(data);
+    if (profileError) return { inSync: false, message: profileError };
   }
+  return report;
 }
-
-async function blobGet(id: string): Promise<StoredBlob | null> {
-  const db = await openDb();
-  const tx = db.transaction("blobs", "readonly");
-  const value = await req<StoredBlob | undefined>(tx.objectStore("blobs").get(id));
-  if (!value?.data || !value.iv) return null;
-  return value;
-}
-
-async function blobSet(id: string, value: StoredBlob): Promise<void> {
-  const db = await openDb();
-  const tx = db.transaction("blobs", "readwrite");
-  tx.objectStore("blobs").put(value, id);
-  await done(tx);
-}
-
 async function decryptData(master: CryptoKey, envelope: Envelope): Promise<DeskData> {
   const bytes = await decryptBytes(master, envelope.iv, envelope.data);
   return parseWorkbook(bytes);
@@ -258,29 +166,14 @@ async function seal(data: DeskData): Promise<string> {
 export type Unlocked = { user: User; data: DeskData };
 
 async function loadVault(): Promise<Unlocked | null> {
-  let envelope = await collect();
-  if (!envelope) {
-    await seedVault();
-    envelope = await collect();
+  const disk = deskDisk();
+  const status = await disk.status();
+  if (disk.kind === "shared" && !status.application && !status.backup) {
+    throw new Error("The shared drive is not available. The desk only saves to Y:\\accounts\\Tools\\Task application and Y:\\accounts\\Task app backup.");
   }
-  if (!envelope) return null;
-  await writeSinks(JSON.stringify(envelope), null);
-  const raw = sessionStorage.getItem(SS_KEY);
-  const userId = sessionStorage.getItem(SS_USER);
-  if (!raw || !userId) return null;
-  try {
-    const master = await importMaster(JSON.parse(raw) as JsonWebKey);
-    const data = await decryptData(master, envelope);
-    const user = data.users.find((item) => item.id === userId);
-    if (!user) throw new Error("missing user");
-    session = { master, wraps: envelope.wraps };
-    lastSnapshot = JSON.stringify(data);
-    return { user, data };
-  } catch {
-    sessionStorage.removeItem(SS_KEY);
-    sessionStorage.removeItem(SS_USER);
-    return null;
-  }
+  const envelope = await collect();
+  if (!envelope) await seedVault();
+  return null;
 }
 
 async function seedVault() {
@@ -294,17 +187,12 @@ async function seedVault() {
   session = null;
 }
 
-async function remember(user: User, master: CryptoKey) {
-  const jwk = await exportMaster(master);
-  sessionStorage.setItem(SS_KEY, JSON.stringify(jwk));
-  sessionStorage.setItem(SS_USER, user.id);
-}
-
 export async function unlock(username: string, password: string): Promise<Unlocked | { error: string }> {
   const envelope = await collect();
   if (!envelope) return { error: "The register could not be opened." };
   const name = username.trim().toLowerCase();
-  const wrap = envelope.wraps[name];
+  const profile = parseProfile(await deskDisk().readProfile(name));
+  const wrap = profile?.wrap ?? envelope.wraps[name];
   if (!wrap) return { error: "That username or password is not on the register." };
   const master = await unwrapMaster(password, wrap);
   if (!master) return { error: "That username or password is not on the register." };
@@ -312,12 +200,11 @@ export async function unlock(username: string, password: string): Promise<Unlock
     const data = await decryptData(master, envelope);
     const user = data.users.find((item) => item.username === name);
     if (!user) return { error: "That username or password is not on the register." };
-    session = { master, wraps: envelope.wraps };
+    session = { master, wraps: { ...envelope.wraps, [name]: wrap } };
     lastSnapshot = JSON.stringify(data);
-    await remember(user, master);
     return { user, data };
   } catch {
-    return { error: "The register could not be read. Reset the desk if this keeps happening." };
+    return { error: "The register could not be read." };
   }
 }
 
@@ -327,6 +214,7 @@ export function cleanUsername(value: string): string {
 
 export function usernameError(username: string): string | null {
   if (!/^[a-z0-9.]{3,24}$/.test(username)) return "Use 3 to 24 letters, numbers or dots.";
+  if (RESERVED_USERS.has(username)) return "That username is reserved.";
   return null;
 }
 
@@ -371,7 +259,6 @@ export async function registerAccount(input: {
   });
   session = { master, wraps: { ...envelope.wraps, [username]: await wrapMaster(master, input.password) } };
   await persist(data, "manual");
-  await remember(user, master);
   return { user, data };
 }
 
@@ -463,12 +350,62 @@ export function exportEnvelope(): string {
   return latestJson;
 }
 
+export function dropWrap(username: string) {
+  if (!session) return;
+  const wraps = { ...session.wraps };
+  delete wraps[username];
+  session = { ...session, wraps };
+}
+
+export function wrapFor(username: string): Wrap | undefined {
+  return session?.wraps[username];
+}
+
+export function restoreWrap(username: string, wrap: Wrap) {
+  if (!session) return;
+  session = { ...session, wraps: { ...session.wraps, [username]: wrap } };
+}
+
+export async function deleteProfileFolders(username: string): Promise<string | null> {
+  try {
+    await deskDisk().deleteProfile(username);
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : "That profile folder could not be deleted.";
+  }
+}
+
+export async function discardAttachment(id: string): Promise<void> {
+  memoryBlobs.delete(id);
+  try {
+    await deskDisk().deleteAttachment(id);
+  } catch {
+    /* The task is already gone. A later save will not bring the file back. */
+  }
+}
+
+async function blobGet(id: string): Promise<StoredBlob | null> {
+  const cached = memoryBlobs.get(id);
+  if (cached) return cached;
+  const packed = await deskDisk().readAttachment(id);
+  if (!packed) return null;
+  const stored = unpackBlob(packed);
+  if (stored) memoryBlobs.set(id, stored);
+  return stored;
+}
+
 export async function storeFile(file: File): Promise<{ id: string } | { error: string }> {
   if (!session) return { error: "Sign in again before attaching a file." };
   if (file.size > 40 * 1024 * 1024) return { error: `${file.name} is over 40 MB.` };
   const id = crypto.randomUUID();
   const sealed = await encryptBlob(session.master, await file.arrayBuffer());
-  await blobSet(id, sealed);
+  try {
+    const status = await deskDisk().writeAttachment(id, packBlob(sealed));
+    if (!status.application && !status.backup) return { error: "That file could not be saved to the shared drive." };
+  } catch {
+    return { error: "That file could not be saved to the shared drive." };
+  }
+  memoryBlobs.set(id, sealed);
   return { id };
 }
 
@@ -478,7 +415,7 @@ export async function readFile(id: string, name: string, mime: string): Promise<
   if (!stored) return false;
   const plain = await decryptBlob(session.master, stored.iv, stored.data);
   if (window.trueDesk?.openFile) {
-    await window.trueDesk.openFile(name, bytesToBase64(plain));
+    await window.trueDesk.openFile(name, toB64(plain));
     return true;
   }
   const blob = new Blob([plain], { type: mime || "application/octet-stream" });
@@ -492,16 +429,6 @@ export async function readFile(id: string, name: string, mime: string): Promise<
   }
   window.setTimeout(() => URL.revokeObjectURL(url), 60000);
   return true;
-}
-
-function bytesToBase64(bytes: ArrayBuffer): string {
-  const view = new Uint8Array(bytes);
-  let binary = "";
-  const step = 0x8000;
-  for (let index = 0; index < view.length; index += step) {
-    binary += String.fromCharCode(...view.subarray(index, index + step));
-  }
-  return btoa(binary);
 }
 
 const RELEASE_TYPES: Record<string, string> = {
@@ -539,12 +466,10 @@ async function collectReleaseFiles(dir: FileSystemDirectoryHandle, prefix: strin
 }
 
 export async function readDeskRelease(): Promise<DeskRelease | null> {
-  const root = await readableHandle("application");
-  if (!root) return null;
+  const text = await deskDisk().readRelease();
+  if (!text) return null;
   try {
-    const update = await root.getDirectoryHandle("update");
-    const file = await (await update.getFileHandle("release.json")).getFile();
-    const parsed = JSON.parse(await file.text()) as { version?: string; notes?: string };
+    const parsed = JSON.parse(text) as { version?: string; notes?: string };
     const version = parsed.version?.trim() ?? "";
     if (!version || !isNewerVersion(version, APP_VERSION)) return null;
     return { version, notes: (parsed.notes ?? "").trim() };
@@ -593,20 +518,8 @@ export async function installDeskRelease(): Promise<string | null> {
   }
 }
 
-export async function linkFolder(slot: Slot): Promise<string | null> {
-  const picker = window.showDirectoryPicker;
-  if (!picker) {
-    return "This browser cannot attach a network folder. Export the protected copy and place the same file in both folders.";
-  }
-  try {
-    const handle = await picker({ mode: "readwrite", id: `truedesk-${slot}` });
-    await handleSet(slot, handle);
-    if (latestJson) await writeVaultFile(handle, latestJson);
-    return null;
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") return null;
-    return "That folder could not be linked.";
-  }
+export async function linkFolder(_slot: Slot): Promise<string | null> {
+  return "The desk already saves to the shared drive. Nothing is stored on this computer.";
 }
 
 const SHEET_FILE = /\.(xlsx|xlsm|xlsb|xls|csv)$/i;
@@ -656,27 +569,10 @@ export async function resetPilot(): Promise<void> {
   session = null;
   latestJson = "";
   lastSnapshot = "";
-  sessionStorage.removeItem(SS_KEY);
-  sessionStorage.removeItem(SS_USER);
-  localStorage.removeItem(LS_APP);
-  localStorage.removeItem(LS_BAK);
-  if (dbPromise) {
-    const db = await dbPromise;
-    db.close();
-    dbPromise = null;
-  }
-  await new Promise<void>((resolve, reject) => {
-    const request = indexedDB.deleteDatabase("truedesk");
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-    request.onblocked = () => resolve();
-  });
-  await seedVault();
+  memoryBlobs.clear();
 }
 
 export function signOutVault() {
   session = null;
   lastSnapshot = "";
-  sessionStorage.removeItem(SS_KEY);
-  sessionStorage.removeItem(SS_USER);
 }

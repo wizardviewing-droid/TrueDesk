@@ -41,7 +41,7 @@ export function SignIn() {
           <p className="mt-6 text-sm font-semibold tracking-widest text-gold uppercase">Task desk</p>
           <h1 className="mt-3 max-w-md text-4xl font-semibold leading-tight">On your side.</h1>
           <p className="mt-4 max-w-md text-paper/80">
-            Open the desk and today’s work is waiting. Tasks, notes and files live in one Excel register, kept identical in both folders.
+            Open the desk and today’s work is waiting. The register, files and each person’s profile are kept only on the shared drive.
           </p>
         </div>
         <dl className="mt-10 grid gap-4 text-sm">
@@ -54,7 +54,7 @@ export function SignIn() {
             <dd className="mt-1 font-medium break-all">{PATHS.backup}</dd>
           </div>
           <p className="text-paper/70">
-            Both copies stay the same. The file is locked with your sign-in password.
+            Each person has a folder in their username. Nothing is stored on this computer. The same password unlocks their profile and the shared register.
           </p>
         </dl>
       </section>

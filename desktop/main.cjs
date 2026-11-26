@@ -104,6 +104,158 @@ ipcMain.handle("read-spreadsheets", async (_event, target) => {
   return out;
 });
 
+const ROOTS = {
+  application: "Y:\\accounts\\Tools\\Task application",
+  backup: "Y:\\accounts\\Task app backup",
+};
+const USERNAME = /^[a-z0-9.]{3,24}$/;
+const RESERVED = new Set(["update", "attachments"]);
+const FILE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function assertUsername(username) {
+  if (typeof username !== "string" || !USERNAME.test(username) || RESERVED.has(username)) {
+    throw new Error("That username cannot be used as a folder.");
+  }
+  return username;
+}
+
+function assertFileId(id) {
+  if (typeof id !== "string" || !FILE_ID.test(id)) throw new Error("That file is not allowed.");
+  return id;
+}
+
+function userFolder(root, username) {
+  const dir = path.resolve(root, username);
+  const rel = path.relative(path.resolve(root), dir);
+  if (rel !== username || rel.includes("..") || path.isAbsolute(rel)) throw new Error("That folder is not allowed.");
+  return dir;
+}
+
+async function ensureRoot(slot) {
+  try {
+    await fs.promises.mkdir(ROOTS[slot], { recursive: true });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function readOptional(file) {
+  try {
+    return await fs.promises.readFile(file);
+  } catch (error) {
+    if (error && error.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+function newerText(texts) {
+  let best = null;
+  let bestAt = "";
+  for (const text of texts) {
+    if (!text) continue;
+    let savedAt = "";
+    try {
+      savedAt = JSON.parse(text).savedAt || "";
+    } catch {
+      savedAt = "";
+    }
+    if (!best || savedAt >= bestAt) {
+      best = text;
+      bestAt = savedAt;
+    }
+  }
+  return best;
+}
+
+async function writeBoth(parts, contents) {
+  const status = { application: false, backup: false };
+  for (const slot of ["application", "backup"]) {
+    try {
+      const dir = path.join(ROOTS[slot], ...parts.slice(0, -1));
+      await fs.promises.mkdir(dir, { recursive: true });
+      const file = path.join(ROOTS[slot], ...parts);
+      const tmp = `${file}.tmp`;
+      await fs.promises.writeFile(tmp, contents);
+      await fs.promises.rename(tmp, file);
+      status[slot] = true;
+    } catch {
+      status[slot] = false;
+    }
+  }
+  if (!status.application && !status.backup) throw new Error("Could not save to the shared drive.");
+  return status;
+}
+
+ipcMain.handle("read-vault", async () => {
+  const application = await ensureRoot("application");
+  const backup = await ensureRoot("backup");
+  const texts = [];
+  if (application) {
+    const buf = await readOptional(path.join(ROOTS.application, "TrueDesk.vault.json"));
+    if (buf) texts.push(buf.toString("utf8"));
+  }
+  if (backup) {
+    const buf = await readOptional(path.join(ROOTS.backup, "TrueDesk.vault.json"));
+    if (buf) texts.push(buf.toString("utf8"));
+  }
+  return { json: newerText(texts), application, backup };
+});
+
+ipcMain.handle("write-vault", async (_event, json) => {
+  if (typeof json !== "string" || !json || json.length > 32_000_000) throw new Error("The desk could not be saved.");
+  return writeBoth(["TrueDesk.vault.json"], json);
+});
+
+ipcMain.handle("read-profile", async (_event, username) => {
+  const name = assertUsername(username);
+  for (const slot of ["application", "backup"]) {
+    const buf = await readOptional(path.join(userFolder(ROOTS[slot], name), "profile.json"));
+    if (buf) return buf.toString("utf8");
+  }
+  return null;
+});
+
+ipcMain.handle("write-profile", async (_event, username, json) => {
+  const name = assertUsername(username);
+  if (typeof json !== "string" || !json || json.length > 200_000) throw new Error("That profile could not be saved.");
+  return writeBoth([name, "profile.json"], json);
+});
+
+ipcMain.handle("delete-profile", async (_event, username) => {
+  const name = assertUsername(username);
+  for (const slot of ["application", "backup"]) {
+    await fs.promises.rm(userFolder(ROOTS[slot], name), { recursive: true, force: true });
+  }
+});
+
+ipcMain.handle("read-attachment", async (_event, id) => {
+  const fileId = assertFileId(id);
+  for (const slot of ["application", "backup"]) {
+    const buf = await readOptional(path.join(ROOTS[slot], "attachments", `${fileId}.bin`));
+    if (buf) return buf.toString("base64");
+  }
+  return null;
+});
+
+ipcMain.handle("write-attachment", async (_event, id, base64) => {
+  const fileId = assertFileId(id);
+  if (typeof base64 !== "string" || !base64 || base64.length > 56_000_000) throw new Error("That file could not be saved.");
+  return writeBoth(["attachments", `${fileId}.bin`], Buffer.from(base64, "base64"));
+});
+
+ipcMain.handle("delete-attachment", async (_event, id) => {
+  const fileId = assertFileId(id);
+  for (const slot of ["application", "backup"]) {
+    await fs.promises.rm(path.join(ROOTS[slot], "attachments", `${fileId}.bin`), { force: true });
+  }
+});
+
+ipcMain.handle("read-release", async () => {
+  const buf = await readOptional(path.join(ROOTS.application, "update", "release.json"));
+  return buf ? buf.toString("utf8") : null;
+});
+
 app.whenReady().then(async () => {
   try {
     await startServer();

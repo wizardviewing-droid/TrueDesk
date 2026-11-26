@@ -6,6 +6,9 @@ import {
   bootVault,
   changePassword,
   cleanUsername,
+  deleteProfileFolders,
+  discardAttachment,
+  dropWrap,
   exportEnvelope,
   folderLinks,
   installDeskRelease,
@@ -15,10 +18,12 @@ import {
   readFile,
   registerAccount,
   resetPilot,
+  restoreWrap,
   signOutVault,
   storeFile,
   unlock,
   usernameError,
+  wrapFor,
 } from "@/lib/desk/storage";
 import type {
   CustomMode,
@@ -108,6 +113,7 @@ type State = {
     job: string;
     team: string;
   }) => Promise<string | null>;
+  removeUser: (id: string) => Promise<string | null>;
   updateOwnPassword: (password: string) => Promise<string | null>;
   togglePin: (id: string) => void;
   addCustomTool: (input: {
@@ -262,8 +268,8 @@ export const useDesk = create<State>((set, get) => {
           });
         }
         void get().checkRelease();
-      } catch {
-        set({ booted: true, bootError: "The desk could not be opened." });
+      } catch (error) {
+        set({ booted: true, bootError: error instanceof Error ? error.message : "The desk could not be opened." });
       }
     },
     signIn: async (username, password) => {
@@ -504,15 +510,18 @@ export const useDesk = create<State>((set, get) => {
     removeTask: (id) => {
       const user = get().user;
       if (!user) return;
+      const gone: string[] = [];
       edit((data) => {
         const task = taskById(data, id);
         if (!task) return;
         if (user.role !== "manager" && task.ownerId !== user.id && task.assigneeId !== user.id) return;
+        gone.push(...data.attachments.filter((item) => item.taskId === id).map((item) => item.id));
         data.tasks = data.tasks.filter((item) => item.id !== id);
         data.notes = data.notes.filter((item) => item.taskId !== id);
         data.attachments = data.attachments.filter((item) => item.taskId !== id);
         log(data, user.id, `${user.name} removed “${task.title}”.`);
       });
+      for (const fileId of gone) void discardAttachment(fileId);
       if (get().editorId === id) set({ editorId: null });
     },
     addNote: (taskId, body) => {
@@ -618,6 +627,46 @@ export const useDesk = create<State>((set, get) => {
       set({ data: result.data, phase: "dirty" });
       schedule();
       get().showToast(`${input.name.trim()} can sign in.`);
+      return null;
+    },
+    removeUser: async (id) => {
+      const actor = get().user;
+      const data = get().data;
+      if (!actor || !data) return "Sign in again.";
+      if (actor.role !== "manager") return "Only a manager can delete a profile.";
+      if (actor.id === id) return "You cannot delete the profile you are signed in with.";
+      const person = data.users.find((item) => item.id === id);
+      if (!person) return "That profile is not on the register.";
+      if (person.role === "manager" && data.users.filter((item) => item.role === "manager").length <= 1) {
+        return "Keep at least one manager.";
+      }
+      const next = structuredClone(data);
+      const now = new Date().toISOString();
+      next.users = next.users.filter((item) => item.id !== id);
+      for (const task of next.tasks) {
+        if (task.assigneeId === id) {
+          task.assigneeId = actor.id;
+          task.assignerId = actor.id;
+          if (task.status !== "done") task.status = "accepted";
+          task.managerAssigned = false;
+          task.updatedAt = now;
+        }
+        if (task.ownerId === id) task.ownerId = actor.id;
+      }
+      next.notices = (next.notices ?? []).filter((notice) => notice.userId !== id);
+      log(next, actor.id, `${actor.name} deleted ${person.name}'s profile.`);
+      const wrap = wrapFor(person.username);
+      dropWrap(person.username);
+      set({ data: next, phase: "dirty" });
+      await enqueue("manual");
+      if (get().phase === "error") {
+        if (wrap) restoreWrap(person.username, wrap);
+        set({ data, phase: "error" });
+        return "The shared drive could not be updated, so the profile was kept.";
+      }
+      const folderError = await deleteProfileFolders(person.username);
+      if (folderError) return folderError;
+      get().showToast(`${person.name}'s profile was deleted.`);
       return null;
     },
     updateOwnPassword: async (password) => {

@@ -53,8 +53,6 @@ export function Shell() {
   const setQuery = useDesk((s) => s.setQuery);
   const phase = useDesk((s) => s.phase);
   const savedAt = useDesk((s) => s.savedAt);
-  const saveMessage = useDesk((s) => s.saveMessage);
-  const links = useDesk((s) => s.links);
   const inSync = useDesk((s) => s.inSync);
   const saveNow = useDesk((s) => s.saveNow);
   const signOut = useDesk((s) => s.signOut);
@@ -63,13 +61,11 @@ export function Shell() {
   const attachFiles = useDesk((s) => s.attachFiles);
   const openTask = useDesk((s) => s.openTask);
   const dismissNotice = useDesk((s) => s.dismissNotice);
-  const link = useDesk((s) => s.link);
   const downloadExcel = useDesk((s) => s.downloadExcel);
   const downloadVault = useDesk((s) => s.downloadVault);
   const toast = useDesk((s) => s.toast);
   const release = useDesk((s) => s.release);
   const installRelease = useDesk((s) => s.installRelease);
-  const showToast = useDesk((s) => s.showToast);
   const [menu, setMenu] = useState(false);
   const [copies, setCopies] = useState(false);
   const [hot, setHot] = useState(false);
@@ -151,8 +147,8 @@ export function Shell() {
         </nav>
         <div className="mt-auto px-5 py-5 text-sm">
           <p className={cx("font-medium", inSync ? "text-gold" : "text-paper")}>{inSync ? "Both copies match" : "Copies need a check"}</p>
-          <p className="mt-1 text-paper/70">{links.application ? "Application folder linked" : "Application copy on this desk"}</p>
-          <p className="text-paper/70">{links.backup ? "Backup folder linked" : "Backup copy kept identical"}</p>
+          <p className="mt-1 text-paper/70">Application copy on the shared drive</p>
+          <p className="text-paper/70">Backup copy on the shared drive</p>
           <button type="button" className="btn btn-quiet mt-2 text-gold" onClick={() => setCopies(true)}>Workbook copies</button>
           <div className="mt-4 border-t border-paper/15 pt-4">
             <p className="font-semibold">{user.name}</p>
@@ -233,14 +229,14 @@ export function Shell() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-xl font-semibold text-navy">Workbook copies</h2>
-                <p className="mt-1 text-sm text-muted">{saveMessage} A checkpoint rewrites both every 10 minutes, when you close the desk, and when you press Save. Changes also write through shortly after you make them. A new desk goes in {PATHS.update}: release.json plus an app folder. The desk notices it and updates itself.</p>
+                <p className="mt-1 text-sm text-muted">Both copies are written only to the shared drive. Each person has a folder in their username. Nothing is stored on this computer.</p>
               </div>
               <button type="button" className="btn btn-ghost min-w-11 px-3" aria-label="Close" onClick={() => setCopies(false)}>
                 <X className="size-4" />
               </button>
             </div>
-            <CopyRow title="Application" path={PATHS.application} linked={links.application} onLink={() => void link("application").then((message) => message && showToast(message))} />
-            <CopyRow title="Backup" path={PATHS.backup} linked={links.backup} onLink={() => void link("backup").then((message) => message && showToast(message))} />
+            <CopyRow title="Application" path={PATHS.application} />
+            <CopyRow title="Backup" path={PATHS.backup} />
             <div className="flex flex-wrap gap-2">
               <button type="button" className="btn btn-navy" onClick={downloadExcel}>
                 <Download className="size-4" aria-hidden="true" />
@@ -255,12 +251,12 @@ export function Shell() {
   );
 }
 
-function CopyRow({ title, path, linked, onLink }: { title: string; path: string; linked: boolean; onLink: () => void }) {
+function CopyRow({ title, path }: { title: string; path: string }) {
   return (
     <div className="rounded-md border border-line px-3 py-3">
       <p className="font-semibold text-navy">{title}</p>
       <p className="text-sm break-all text-muted">{path}</p>
-      <button type="button" className="btn btn-quiet mt-1 px-0" onClick={onLink}>{linked ? "Linked — choose again" : "Link this folder"}</button>
+      <p className="mt-1 text-sm text-muted">Profiles are folders named with the username.</p>
     </div>
   );
 }
