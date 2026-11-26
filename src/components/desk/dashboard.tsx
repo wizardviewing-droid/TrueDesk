@@ -1,11 +1,11 @@
 import { format } from "date-fns";
-import { AlertTriangle, CalendarDays, ChevronRight, CircleCheck, ClipboardList, Paperclip, Table, Users, Wrench } from "lucide-react";
+import { AlertTriangle, CalendarDays, ChevronRight, CircleCheck, ClipboardList, Coins, Paperclip, Table, Users, Wrench } from "lucide-react";
 import { useState } from "react";
 import { TaskActions } from "@/components/desk/task-actions";
 import { cx } from "@/lib/cx";
 import { parseISODate, todayISO } from "@/lib/desk/dates";
 import { matchesQuery, priorityRank, useDesk } from "@/lib/desk/store";
-import { repeatLabel, taskRepeat, type Attachment, type Priority, type Task } from "@/lib/desk/types";
+import { repeatLabel, taskRepeat, type Attachment, type Task } from "@/lib/desk/types";
 
 type Lens = "all" | "open" | "overdue" | "done";
 
@@ -55,25 +55,25 @@ export function Dashboard() {
     <div className="grid gap-4">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-semibold text-navy">
+          <h1 className="text-4xl font-semibold tracking-tight text-navy">
             {hello}, {user.name.split(" ")[0]}
           </h1>
           <p className="mt-1 text-muted">{user.team}</p>
         </div>
-        <p className="flex items-center gap-2 px-1 font-semibold text-navy">
+        <p className="flex items-center gap-2 rounded-full bg-card px-4 py-2 text-sm font-semibold text-navy shadow-sm">
           <CalendarDays className="size-5" aria-hidden="true" />
           {format(new Date(), "EEE d MMMM yyyy")}
         </p>
       </header>
 
       <div className="grid gap-3 md:grid-cols-3">
-        <Jump icon={CalendarDays} label="Calendar" onClick={() => setView("calendar")} />
-        <Jump icon={Wrench} label="Tools" onClick={() => setView("tools")} />
-        <Jump icon={Table} label="My work list" onClick={() => setView("register")} />
+        <Jump icon={CalendarDays} label="Calendar" tone="gold" onClick={() => setView("calendar")} />
+        <Jump icon={Wrench} label="Tools" tone="lilac" onClick={() => setView("tools")} />
+        <Jump icon={Table} label="My work list" tone="sky" onClick={() => setView("register")} />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Today's outstanding tasks" value={mine.todayOpen.length} tone="sky" icon={ClipboardList} active={board === "mine" && lens === "open"} onClick={() => { setBoard("mine"); pick("open"); }} />
+        <Stat label="Outstanding tasks" value={mine.todayOpen.length} tone="sky" icon={ClipboardList} active={board === "mine" && lens === "open"} onClick={() => { setBoard("mine"); pick("open"); }} />
         <Stat label="Overdue tasks" value={mine.overdue.length} tone="coral" icon={AlertTriangle} active={board === "mine" && lens === "overdue"} onClick={() => { setBoard("mine"); pick("overdue"); }} />
         <Stat label="Completed tasks" value={mine.done.length} tone="sage" icon={CircleCheck} active={board === "mine" && lens === "done"} onClick={() => { setBoard("mine"); pick("done"); }} />
         <Stat label="Team tasks" value={team.live.length} tone="gold" icon={Users} active={board === "team"} onClick={() => setBoard((current) => (current === "team" ? "mine" : "team"))} />
@@ -134,15 +134,15 @@ function TaskPanel({
   return (
     <section>
       <div className="mb-3 flex items-end justify-between gap-3 px-1">
-        <h2 className="text-lg font-semibold text-navy">{title}</h2>
+        <h2 className="text-2xl font-semibold text-navy">{title}</h2>
         <span className="text-sm font-semibold tabular-nums text-muted">{tasks.length}</span>
       </div>
       {tasks.length === 0 ? (
         <p className="card px-5 py-10 text-muted">{empty}</p>
       ) : (
         <ul className="grid gap-3">
-          {tasks.map((task) => (
-            <TaskRow key={task.id} task={task} today={today} who={who?.(task.assigneeId)} files={files(task.id)} done={task.status === "done"} onOpen={() => onOpen(task.id)} onFile={onFile} />
+          {tasks.map((task, index) => (
+            <TaskRow key={task.id} task={task} index={index} today={today} who={who?.(task.assigneeId)} files={files(task.id)} done={task.status === "done"} onOpen={() => onOpen(task.id)} onFile={onFile} />
           ))}
         </ul>
       )}
@@ -150,15 +150,47 @@ function TaskPanel({
   );
 }
 
-function Jump({ icon: Icon, label, onClick }: { icon: typeof CalendarDays; label: string; onClick: () => void }) {
+function Jump({ icon: Icon, label, tone, onClick }: { icon: typeof CalendarDays; label: string; tone: "gold" | "lilac" | "sky"; onClick: () => void }) {
+  const wash = {
+    gold: "from-[#fff8ea] to-[#ffe7b0]",
+    lilac: "from-[#f6f1ff] to-[#e4dcff]",
+    sky: "from-[#f3f8ff] to-[#d9ebff]",
+  }[tone];
   return (
-    <button type="button" className="card flex min-h-16 items-center gap-3 px-4 text-left" onClick={onClick}>
-      <span className="grid size-10 place-items-center rounded-md bg-paper text-navy">
+    <button type="button" className={cx("relative flex min-h-20 items-center gap-3 overflow-hidden rounded-2xl border border-white bg-linear-to-r px-4 text-left shadow-sm", wash)} onClick={onClick}>
+      <span className="grid size-11 place-items-center rounded-full bg-card/80 text-navy shadow-sm">
         <Icon className="size-5" aria-hidden="true" />
       </span>
-      <span className="font-semibold text-navy">{label}</span>
+      <span className="text-lg font-semibold text-navy">{label}</span>
       <ChevronRight className="ml-auto size-4 text-muted" aria-hidden="true" />
+      <JumpArt tone={tone} />
     </button>
+  );
+}
+
+function JumpArt({ tone }: { tone: "gold" | "lilac" | "sky" }) {
+  const color = tone === "gold" ? "#e7c56a" : tone === "lilac" ? "#b7a6e8" : "#9ec4ef";
+  return (
+    <svg className="pointer-events-none absolute right-8 bottom-1 h-14 w-20 opacity-80" viewBox="0 0 80 56" aria-hidden="true">
+      {tone === "lilac" ? (
+        <>
+          <circle cx="28" cy="30" r="12" fill="none" stroke={color} strokeWidth="3" />
+          <circle cx="50" cy="22" r="9" fill="none" stroke={color} strokeWidth="3" />
+          <circle cx="54" cy="40" r="7" fill="none" stroke={color} strokeWidth="3" />
+        </>
+      ) : tone === "sky" ? (
+        <>
+          <rect x="18" y="8" width="36" height="42" rx="6" fill="none" stroke={color} strokeWidth="3" />
+          <path d="M26 22h20M26 30h16M26 38h12" stroke={color} strokeWidth="3" strokeLinecap="round" />
+        </>
+      ) : (
+        <>
+          <rect x="16" y="10" width="34" height="36" rx="5" fill="none" stroke={color} strokeWidth="3" />
+          <path d="M16 20h34" stroke={color} strokeWidth="3" />
+          <path d="M26 6v8M40 6v8" stroke={color} strokeWidth="3" strokeLinecap="round" />
+        </>
+      )}
+    </svg>
   );
 }
 
@@ -178,56 +210,65 @@ function Stat({
   onClick: () => void;
 }) {
   const toneClass = {
-    sky: "bg-sky-soft text-sky",
-    coral: "bg-coral-soft text-coral",
-    sage: "bg-sage-soft text-sage",
-    gold: "bg-gold-soft text-navy",
+    sky: "from-[#e7f3ff] to-[#d5e9fb] text-sky",
+    coral: "from-[#fdeceb] to-[#f8d5d1] text-coral",
+    sage: "from-[#e7f7ec] to-[#d3f0dc] text-sage",
+    gold: "from-[#fff6dc] to-[#ffe7a8] text-navy",
+  }[tone];
+  const numberClass = {
+    sky: "text-sky",
+    coral: "text-coral",
+    sage: "text-sage",
+    gold: "text-[#c49212]",
   }[tone];
   return (
-    <button type="button" className={cx("flex min-h-16 items-center gap-3 rounded-lg px-4 text-left", toneClass, active && "outline-2 outline-offset-2 outline-navy")} aria-pressed={active} onClick={onClick}>
-      <Icon className="size-5 shrink-0" aria-hidden="true" />
-      <span className="font-semibold text-navy">{label}</span>
-      <span className="ml-auto text-2xl font-semibold tabular-nums">{value}</span>
+    <button type="button" className={cx("relative flex min-h-20 items-center gap-3 overflow-hidden rounded-2xl bg-linear-to-r px-4 text-left shadow-sm", toneClass, active && "outline-2 outline-offset-2 outline-navy")} aria-pressed={active} onClick={onClick}>
+      <svg className="pointer-events-none absolute inset-x-0 bottom-0 h-10 w-full opacity-50" viewBox="0 0 200 40" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0 24 C40 8 80 36 120 18 C150 6 180 28 200 14 L200 40 L0 40 Z" fill="white" />
+      </svg>
+      <Icon className="relative size-5 shrink-0" aria-hidden="true" />
+      <span className="relative font-semibold text-navy">{label}</span>
+      <span className={cx("relative ml-auto text-3xl font-semibold tabular-nums", numberClass)}>{value}</span>
     </button>
   );
 }
 
-function priorityPill(priority: Priority) {
-  if (priority === "high") return { label: "High", className: "bg-coral-soft text-coral" };
-  if (priority === "low") return { label: "Low", className: "bg-sky-soft text-sky" };
-  return { label: "Normal", className: "bg-gold-soft text-navy" };
-}
-
-function TaskRow({ task, today, who, files, done, onOpen, onFile }: { task: Task; today: string; who?: string; files: Attachment[]; done: boolean; onOpen: () => void; onFile: (id: string) => void }) {
-  const pill = priorityPill(task.priority);
+function TaskRow({ task, index, today, who, files, done, onOpen, onFile }: { task: Task; index: number; today: string; who?: string; files: Attachment[]; done: boolean; onOpen: () => void; onFile: (id: string) => void }) {
   const repeat = taskRepeat(task);
   const overdue = !done && Boolean(task.date && task.date < today);
   const waiting = task.status === "pending";
-  const accent = done ? "border-l-sage" : overdue || task.priority === "high" ? "border-l-coral" : task.priority === "low" ? "border-l-sky" : "border-l-gold";
+  const dueToday = !done && task.date === today;
+  const warm = index % 2 === 1;
+  const subtitle = task.matter || task.practice || who || "Accounts";
+  const due = done ? "Done" : waiting ? "To accept" : overdue ? "Overdue" : dueToday ? "Due today" : task.date ? format(parseISODate(task.date), "d MMM") : "No date";
   return (
-    <li className={cx("card overflow-hidden border-l-4 shadow-sm", accent, done && "opacity-75")}>
-      <div className="flex items-start gap-4 px-4 py-4">
-        <button type="button" className="min-w-0 flex-1 text-left" onClick={onOpen}>
-          <span className={cx("block text-lg font-semibold text-navy", done && "text-muted line-through")}>{task.title}</span>
-          <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
-            <span className={cx(overdue && "font-semibold text-coral")}>
-              {task.date ? format(parseISODate(task.date), "EEE d MMM") : "No date"}
+    <li className={cx("relative overflow-hidden rounded-2xl border border-white shadow-sm", warm ? "bg-linear-to-r from-[#fff8e8] to-[#fff3d4]" : "bg-linear-to-r from-[#eef6ff] to-[#e4f1ff]", done && "opacity-75")}>
+      <span className={cx("absolute inset-y-0 left-0 w-1.5", done ? "bg-sage" : overdue ? "bg-coral" : warm ? "bg-gold" : "bg-sky")} />
+      <div className="flex items-center gap-4 px-5 py-4">
+        <button type="button" className="flex min-w-0 flex-1 items-center gap-4 text-left" onClick={onOpen}>
+          <span className="grid size-12 shrink-0 place-items-center rounded-full bg-card/80 text-navy shadow-sm">
+            {warm ? <Coins className="size-5" aria-hidden="true" /> : <ClipboardList className="size-5" aria-hidden="true" />}
+          </span>
+          <span className="min-w-0">
+            <span className={cx("block truncate text-lg font-semibold text-navy", done && "text-muted line-through")}>{task.title}</span>
+            <span className="mt-0.5 block truncate text-sm text-muted">
+              {subtitle}
+              {who ? ` · ${who}` : ""}
+              {repeat !== "once" ? ` · ${repeatLabel(repeat)}` : ""}
+              {files.length ? ` · ${files.length} file${files.length === 1 ? "" : "s"}` : ""}
             </span>
-            {task.time ? <span>{task.time}</span> : null}
-            {who ? <span className="font-medium text-navy">{who}</span> : null}
-            {repeat !== "once" ? <span>{repeatLabel(repeat)}</span> : null}
-            {files.length ? <span>{files.length} file{files.length === 1 ? "" : "s"}</span> : null}
           </span>
         </button>
-        <span className={cx("shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold", done ? "bg-sage-soft text-sage" : waiting ? "bg-gold-soft text-navy" : pill.className)}>
-          {done ? "Done" : waiting ? "To accept" : pill.label}
+        <span className={cx("relative shrink-0 rounded-full bg-card/80 px-3 py-1 text-sm font-semibold text-navy shadow-sm", overdue && "text-coral", done && "text-sage")}>
+          {due}
         </span>
       </div>
+      <TaskArt warm={warm} />
       {files.length ? (
-        <ul className="grid gap-1 px-4 pb-3">
+        <ul className="grid gap-1 px-5 pb-3">
           {files.map((file) => (
             <li key={file.id}>
-              <button type="button" className="flex min-h-9 w-full items-center gap-2 rounded-md bg-paper px-2 text-left text-sm font-medium text-navy" onClick={() => onFile(file.id)}>
+              <button type="button" className="flex min-h-9 w-full items-center gap-2 rounded-full bg-card/70 px-3 text-left text-sm font-medium text-navy" onClick={() => onFile(file.id)}>
                 <Paperclip className="size-3.5 shrink-0" aria-hidden="true" />
                 <span className="truncate">{file.name}</span>
                 <span className="ml-auto text-xs text-muted">Open</span>
@@ -236,9 +277,29 @@ function TaskRow({ task, today, who, files, done, onOpen, onFile }: { task: Task
           ))}
         </ul>
       ) : null}
-      <div className="border-t border-line bg-paper/70 px-4 py-3">
+      <div className="border-t border-white/70 px-5 py-3">
         <TaskActions taskId={task.id} />
       </div>
     </li>
+  );
+}
+
+function TaskArt({ warm }: { warm: boolean }) {
+  const color = warm ? "#e3c36a" : "#9ec4ef";
+  return (
+    <svg className="pointer-events-none absolute top-3 right-28 hidden h-14 w-16 sm:block" viewBox="0 0 64 56" aria-hidden="true">
+      {warm ? (
+        <>
+          <ellipse cx="22" cy="34" rx="12" ry="7" fill="none" stroke={color} strokeWidth="2.5" />
+          <ellipse cx="40" cy="26" rx="12" ry="7" fill="none" stroke={color} strokeWidth="2.5" />
+          <ellipse cx="30" cy="18" rx="10" ry="6" fill="none" stroke={color} strokeWidth="2.5" />
+        </>
+      ) : (
+        <>
+          <rect x="16" y="8" width="28" height="38" rx="4" fill="none" stroke={color} strokeWidth="2.5" />
+          <path d="M22 20h16M22 28h12M22 36h10" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
+        </>
+      )}
+    </svg>
   );
 }

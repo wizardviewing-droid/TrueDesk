@@ -3,7 +3,7 @@ import {
   Bell,
   CalendarDays,
   Download,
-  LayoutDashboard,
+  LayoutGrid,
   LogOut,
   Menu,
   Plus,
@@ -29,8 +29,8 @@ import { NewTaskDialog } from "@/components/desk/new-task";
 import { TaskDrawer } from "@/components/desk/task-drawer";
 import { ToolsView } from "@/components/desk/tools-view";
 
-const NAV: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
-  { id: "today", label: "My dashboard", icon: LayoutDashboard },
+const NAV: { id: View; label: string; icon: typeof LayoutGrid }[] = [
+  { id: "today", label: "My dashboard", icon: LayoutGrid },
   { id: "calendar", label: "Calendar", icon: CalendarDays },
   { id: "register", label: "Work list", icon: Table },
   { id: "tools", label: "Tools", icon: Wrench },
@@ -124,12 +124,12 @@ export function Shell() {
         } else void addFilesAsTasks(files, date || undefined);
       }}
     >
-      <aside className={cx("fixed inset-y-0 left-0 z-30 flex w-72 flex-col bg-navy text-paper md:static md:translate-x-0", menu ? "translate-x-0" : "-translate-x-full md:translate-x-0")}>
-        <div className="px-5 pt-6">
-          <TrueMark className="h-7 w-auto text-gold" />
-          <p className="mt-4 text-xs font-semibold tracking-widest text-gold uppercase">Accounts task desk</p>
+      <aside className={cx("fixed inset-y-0 left-0 z-30 flex w-64 flex-col overflow-hidden bg-[#102454] text-paper md:static md:translate-x-0", menu ? "translate-x-0" : "-translate-x-full md:translate-x-0")}>
+        <div className="px-5 pt-7">
+          <TrueMark className="h-6 w-auto text-gold" />
+          <p className="mt-3 text-[11px] font-semibold tracking-[0.18em] text-gold uppercase">Accounts task desk</p>
         </div>
-        <nav className="mt-6 grid gap-1 px-3">
+        <nav className="mt-7 grid gap-1 px-3">
           {NAV.map((item) => {
             const Icon = item.icon;
             const active = view === item.id;
@@ -137,7 +137,7 @@ export function Shell() {
               <button
                 key={item.id}
                 type="button"
-                className={cx("flex min-h-11 items-center gap-3 rounded-md px-3 text-left text-sm font-semibold", active ? "bg-gold text-navy" : "text-paper/80 hover:bg-paper/5")}
+                className={cx("flex min-h-11 items-center gap-3 rounded-xl px-3 text-left text-sm font-semibold", active ? "bg-gold text-navy shadow-sm" : "text-paper/85 hover:bg-paper/10")}
                 onClick={() => { setView(item.id); setMenu(false); }}
               >
                 <Icon className="size-4" aria-hidden="true" />
@@ -147,46 +147,54 @@ export function Shell() {
             );
           })}
         </nav>
-        <div className="mt-auto px-5 py-5 text-sm">
-          <p className={cx("font-medium", inSync ? "text-gold" : "text-paper")}>{inSync ? "Both copies match" : "Copies need a check"}</p>
-          <p className="mt-1 text-paper/70">Application copy on the shared drive</p>
-          <p className="text-paper/70">Backup copy on the shared drive</p>
-          <button type="button" className="btn btn-quiet mt-2 text-gold" onClick={() => setCopies(true)}>Workbook copies</button>
-          <div className="mt-4 border-t border-paper/15 pt-4">
-            <p className="font-semibold">{user.name}</p>
-            <p className="text-paper/70">{user.job}</p>
-            <button type="button" className="btn btn-quiet mt-2 px-0 text-paper" onClick={() => void signOut()}>
-              <LogOut className="size-4" aria-hidden="true" />
-              Sign out
-            </button>
+        <div className="relative mt-auto px-5 pt-16 pb-5 text-sm">
+          <svg className="pointer-events-none absolute right-0 bottom-0 left-0 h-40 w-full text-gold" viewBox="0 0 260 160" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M-10 120 C70 40 150 150 270 70 L270 170 L-10 170 Z" fill="currentColor" opacity="0.18" />
+            <path d="M-10 138 C80 70 160 160 270 96" fill="none" stroke="currentColor" strokeWidth="3" opacity="0.55" />
+          </svg>
+          <div className="relative">
+            <p className={cx("font-semibold", inSync ? "text-gold" : "text-paper")}>{inSync ? "Both copies match" : "Copies need a check"}</p>
+            <p className="mt-2 text-paper/75">Application copy on the shared drive</p>
+            <p className="text-paper/75">Backup copy on the shared drive</p>
+            <button type="button" className="btn btn-quiet mt-4 px-0 text-gold" onClick={() => setCopies(true)}>Workbook copies</button>
+            <div className="mt-5">
+              <p className="font-semibold">{user.name}</p>
+              <p className="text-paper/75">{user.job}</p>
+              <button type="button" className="btn btn-quiet mt-3 px-0 text-paper" onClick={() => void signOut()}>
+                <LogOut className="size-4" aria-hidden="true" />
+                Sign out
+              </button>
+            </div>
           </div>
         </div>
       </aside>
       {menu ? <button type="button" className="fixed inset-0 z-20 bg-navy/40 md:hidden" aria-label="Close menu" onClick={() => setMenu(false)} /> : null}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex flex-wrap items-center gap-3 border-b border-line bg-card px-4 py-3">
-          <button type="button" className="btn btn-ghost min-w-11 px-3 md:hidden" aria-label="Open menu" onClick={() => setMenu(true)}>
+        <header className="flex flex-wrap items-center gap-3 px-4 py-4 md:px-8">
+          <button type="button" className="btn btn-ghost min-w-11 rounded-full bg-card px-3 md:hidden" aria-label="Open menu" onClick={() => setMenu(true)}>
             <Menu className="size-4" aria-hidden="true" />
           </button>
-          <label className="relative min-w-0 flex-1">
+          <label className="relative min-w-56 flex-1 md:max-w-md">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" aria-hidden="true" />
-            <input className="input pl-10" placeholder="Search tasks" value={query} onChange={(event) => setQuery(event.target.value)} />
+            <input className="input rounded-full bg-card pl-10 shadow-sm" placeholder="Search tasks" value={query} onChange={(event) => setQuery(event.target.value)} />
           </label>
-          <p className="text-sm text-muted tabular-nums" aria-live="polite">{saveLabel(phase, savedAt)}</p>
-          <button type="button" className="btn btn-ghost" onClick={() => void saveNow()}>
-            <Save className="size-4" aria-hidden="true" />
-            Save
-          </button>
-          {pending || unread.length ? (
-            <button type="button" className="btn btn-navy" onClick={() => window.dispatchEvent(new Event("truedesk-wake"))}>
-              <Bell className="size-4" aria-hidden="true" />
-              {pending + unread.length}
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <p className="px-1 text-sm text-muted tabular-nums" aria-live="polite">{saveLabel(phase, savedAt)}</p>
+            <button type="button" className="btn btn-ghost rounded-full bg-card shadow-sm" onClick={() => void saveNow()}>
+              <Save className="size-4" aria-hidden="true" />
+              Save
             </button>
-          ) : null}
-          <button type="button" className="btn btn-gold" onClick={() => openCompose()}>
-            <Plus className="size-4" aria-hidden="true" />
-            Add task
-          </button>
+            {pending || unread.length ? (
+              <button type="button" className="btn btn-navy rounded-full" onClick={() => window.dispatchEvent(new Event("truedesk-wake"))}>
+                <Bell className="size-4" aria-hidden="true" />
+                {pending + unread.length}
+              </button>
+            ) : null}
+            <button type="button" className="btn btn-gold rounded-full shadow-sm" onClick={() => openCompose()}>
+              <Plus className="size-4" aria-hidden="true" />
+              Add task
+            </button>
+          </div>
         </header>
         {release ? (
           <div className="flex flex-wrap items-center justify-between gap-3 bg-gold px-4 py-3 text-navy">
@@ -209,7 +217,7 @@ export function Shell() {
             </span>
           </div>
         ))}
-        <main className="min-h-0 flex-1 overflow-auto px-4 py-5 md:px-6">
+        <main className="min-h-0 flex-1 overflow-auto px-4 pb-8 md:px-8">
           {view === "today" ? <Dashboard /> : null}
           {view === "calendar" ? <CalendarView /> : null}
           {view === "register" ? <RegisterView /> : null}
