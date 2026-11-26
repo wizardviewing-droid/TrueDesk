@@ -52,8 +52,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          tag=v1.0.9
-          notes="Windows app for the accounts desk. Unzip TrueDesk.zip and open TrueDesk.exe. Add a task waits until you press Add. Reallocate asks you to confirm. Home screen tasks are easier to read."
+          tag=v1.0.10
+          notes="Windows app for the accounts desk. Unzip TrueDesk.zip and open TrueDesk.exe. Today's outstanding tasks are only today's. A repeating task shows on the calendar every time it is due."
           for i in 1 2 3 4 5 6; do
             if gh release view "$tag" >/dev/null 2>&1; then
               break

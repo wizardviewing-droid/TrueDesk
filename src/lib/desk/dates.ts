@@ -82,6 +82,24 @@ export function addYearsISO(iso: string, years: number): string {
   return toISODate(d);
 }
 
+function utcDay(iso: string): number {
+  const d = parseISODate(iso);
+  return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
+}
+
+export function occursOn(date: string, repeat: "once" | "daily" | "weekly" | "monthly" | "annual" | undefined, iso: string): boolean {
+  if (!date || !iso) return false;
+  if (!repeat || repeat === "once") return date === iso;
+  if (iso < date) return false;
+  if (repeat === "daily") return true;
+  if (repeat === "weekly") return (utcDay(iso) - utcDay(date)) % 7 === 0;
+  const start = parseISODate(date);
+  const day = parseISODate(iso);
+  if (repeat === "annual") return day.getMonth() === start.getMonth() && day.getDate() === start.getDate();
+  const last = new Date(day.getFullYear(), day.getMonth() + 1, 0).getDate();
+  return day.getDate() === Math.min(start.getDate(), last);
+}
+
 export function dayBefore(iso: string): string {
   return addDays(iso, -1);
 }

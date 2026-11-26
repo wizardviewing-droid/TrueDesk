@@ -18,8 +18,9 @@ function listFor(pool: Task[], lens: Lens, today: string, byWhen: (a: Task, b: T
   const overdue = live.filter((task) => task.date && task.date < today);
   const todayTasks = live.filter((task) => task.date === today);
   const done = pool.filter((task) => task.status === "done").sort((a, b) => (b.completedAt || b.updatedAt).localeCompare(a.completedAt || a.updatedAt));
-  const tasks = lens === "done" ? done : lens === "overdue" ? overdue : lens === "open" ? live : [...overdue, ...todayTasks];
-  return { live, overdue, done, tasks };
+  const todayOpen = live.filter((task) => task.date === today);
+  const tasks = lens === "done" ? done : lens === "overdue" ? overdue : lens === "open" ? todayOpen : [...overdue, ...todayTasks];
+  return { live, overdue, done, tasks, todayOpen };
 }
 
 export function Dashboard() {
@@ -43,8 +44,8 @@ export function Dashboard() {
   const pending = data.tasks.filter((task) => visible(task) && task.assigneeId === user.id && task.status === "pending").sort(byWhen);
   const hour = new Date().getHours();
   const hello = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-  const yourTitle = lens === "done" ? "Your completed tasks" : lens === "overdue" ? "Your overdue tasks" : lens === "open" ? "Your outstanding tasks" : "Your tasks – today";
-  const teamTitle = lens === "done" ? "Team completed" : lens === "overdue" ? "Team overdue" : lens === "open" ? "Team outstanding" : "Team tasks – today";
+  const yourTitle = lens === "done" ? "Your completed tasks" : lens === "overdue" ? "Your overdue tasks" : lens === "open" ? "Today's outstanding tasks" : "Your tasks – today";
+  const teamTitle = lens === "done" ? "Team completed" : lens === "overdue" ? "Team overdue" : lens === "open" ? "Today's team tasks" : "Team tasks – today";
 
   function pick(next: Lens) {
     setLens((current) => (current === next ? "all" : next));
@@ -72,7 +73,7 @@ export function Dashboard() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Outstanding tasks" value={mine.live.length} tone="sky" icon={ClipboardList} active={board === "mine" && lens === "open"} onClick={() => { setBoard("mine"); pick("open"); }} />
+        <Stat label="Today's outstanding tasks" value={mine.todayOpen.length} tone="sky" icon={ClipboardList} active={board === "mine" && lens === "open"} onClick={() => { setBoard("mine"); pick("open"); }} />
         <Stat label="Overdue tasks" value={mine.overdue.length} tone="coral" icon={AlertTriangle} active={board === "mine" && lens === "overdue"} onClick={() => { setBoard("mine"); pick("overdue"); }} />
         <Stat label="Completed tasks" value={mine.done.length} tone="sage" icon={CircleCheck} active={board === "mine" && lens === "done"} onClick={() => { setBoard("mine"); pick("done"); }} />
         <Stat label="Team tasks" value={team.live.length} tone="gold" icon={Users} active={board === "team"} onClick={() => setBoard((current) => (current === "team" ? "mine" : "team"))} />

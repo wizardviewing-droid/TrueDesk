@@ -3,8 +3,9 @@ import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cx } from "@/lib/cx";
 import { TaskActions } from "@/components/desk/task-actions";
-import { parseISODate, todayISO, toISODate } from "@/lib/desk/dates";
+import { occursOn, parseISODate, todayISO, toISODate } from "@/lib/desk/dates";
 import { matchesQuery, useDesk } from "@/lib/desk/store";
+import { taskRepeat } from "@/lib/desk/types";
 
 export function CalendarView() {
   const data = useDesk((s) => s.data);
@@ -37,7 +38,9 @@ export function CalendarView() {
     const notes = data.notes.filter((note) => note.taskId === task.id).map((note) => note.body).join(" ");
     return matchesQuery(task, notes, query);
   });
-  const selectedTasks = tasks.filter((task) => task.date === selected).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+  const onDay = (iso: string) =>
+    tasks.filter((task) => occursOn(task.date, taskRepeat(task), iso)).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+  const selectedTasks = onDay(selected);
 
   return (
     <div className="grid gap-5 lg:grid-cols-3">
@@ -69,7 +72,7 @@ export function CalendarView() {
           {days.map((day) => {
             const iso = toISODate(day);
             const inMonth = day.getMonth() === cursor.getMonth();
-            const items = tasks.filter((task) => task.date === iso);
+            const items = onDay(iso);
             return (
               <div
                 key={iso}
@@ -99,7 +102,7 @@ export function CalendarView() {
                     <button
                       key={task.id}
                       type="button"
-                      draggable
+                      draggable={task.date === iso}
                       onDragStart={(event) => {
                         event.dataTransfer.setData("application/x-truedesk-task", task.id);
                         event.dataTransfer.effectAllowed = "move";
