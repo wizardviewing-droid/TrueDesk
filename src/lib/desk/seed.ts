@@ -10,45 +10,6 @@ export function buildSeed(): DeskData {
     attachments: [],
     tools: [
       {
-        id: "tool-limitation",
-        name: "Limitation calculator",
-        description:
-          "Import a sheet of accident dates, or type one date. The desk returns the limitation date and the day to issue by.",
-        kind: "limitation",
-        pinned: true,
-      },
-      {
-        id: "tool-time",
-        name: "Time recording summary",
-        description:
-          "Import a time sheet. The desk returns hours and value by fee earner and by matter.",
-        kind: "time",
-        pinned: true,
-      },
-      {
-        id: "tool-bundle",
-        name: "Bundle index",
-        description: "Drop the files for a hearing. The desk returns a numbered index workbook.",
-        kind: "bundle",
-        pinned: true,
-      },
-      {
-        id: "tool-disbursement",
-        name: "Disbursement checker",
-        description:
-          "Import a disbursement ledger. The desk flags VAT, totals that do not add up, and duplicate invoices.",
-        kind: "disbursement",
-        pinned: false,
-      },
-      {
-        id: "tool-cleaner",
-        name: "Schedule cleaner",
-        description:
-          "Import a schedule. The desk tidies names and postcodes, and drops empty rows.",
-        kind: "cleaner",
-        pinned: false,
-      },
-      {
         id: "tool-ax",
         name: "AX daily payment",
         description:
@@ -78,8 +39,11 @@ export function buildSeed(): DeskData {
   };
 }
 
+const SAMPLE_KINDS = new Set(["limitation", "time", "bundle", "disbursement", "cleaner"]);
+
 export function withStandardTools(data: DeskData): DeskData {
-  const ids = new Set(data.tools.map((tool) => tool.id));
+  const kept = data.tools.filter((tool) => !SAMPLE_KINDS.has(tool.kind));
+  const ids = new Set(kept.map((tool) => tool.id));
   const extra = buildSeed().tools.filter((tool) => !ids.has(tool.id));
   let users = data.users.map((user) => {
     const role = user.role as string;
@@ -90,6 +54,7 @@ export function withStandardTools(data: DeskData): DeskData {
   }
   if (!data.notices) data.notices = [];
   const rolesChanged = users.some((user, index) => user !== data.users[index]);
-  if (!extra.length && !rolesChanged) return data;
-  return { ...data, users, tools: extra.length ? [...data.tools, ...extra] : data.tools };
+  const toolsChanged = extra.length > 0 || kept.length !== data.tools.length;
+  if (!toolsChanged && !rolesChanged) return data;
+  return { ...data, users, tools: extra.length ? [...kept, ...extra] : kept };
 }

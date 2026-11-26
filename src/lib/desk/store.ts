@@ -16,6 +16,7 @@ import {
   persist,
   readDeskRelease,
   readFile,
+  readSharedDesk,
   registerAccount,
   resetPilot,
   restoreWrap,
@@ -24,6 +25,9 @@ import {
   unlock,
   usernameError,
   wrapFor,
+  applySharedPaths,
+  markPathsDirty,
+  pathsAwaitingSave,
 } from "@/lib/desk/storage";
 import type {
   CustomMode,
@@ -153,6 +157,19 @@ function enqueue(reason: "auto" | "manual" | "checkpoint" | "close"): Promise<vo
   return run;
 }
 
+async function pullPaths() {
+  const state = api();
+  if (!state.data || !state.user || state.phase === "saving" || pathsAwaitingSave()) return;
+  const shared = await readSharedDesk();
+  if (!shared) return;
+  const latest = api().data;
+  if (!latest || api().phase === "saving") return;
+  const next = structuredClone(latest);
+  if (!applySharedPaths(next, shared)) return;
+  if (api().phase === "saving") return;
+  useDesk.setState({ data: next });
+}
+
 function schedule() {
   api().phase;
   window.clearTimeout(timer);
@@ -245,7 +262,7 @@ export const useDesk = create<State>((set, get) => {
     query: "",
     scope: "mine",
     editorId: null,
-    toolId: "tool-limitation",
+    toolId: "tool-ax",
     phase: "saved",
     savedAt: null,
     saveMessage: "Both copies match.",
@@ -269,10 +286,7 @@ export const useDesk = create<State>((set, get) => {
           links,
           phase: "saved",
         });
-        if (restored && data && data !== restored.data) {
-          void enqueue("auto");
-          if (data.tools.length !== restored.data.tools.length) get().showToast("AX, Infotrack and Kindertons are in the tool library.");
-        }
+        if (restored && data && data !== restored.data) void enqueue("auto");
         if (!checkpoint) {
           checkpoint = window.setInterval(() => {
             if (api().data && api().user) void enqueue("checkpoint");
@@ -289,9 +303,14 @@ export const useDesk = create<State>((set, get) => {
           document.addEventListener("visibilitychange", hidden);
           window.setInterval(() => {
             void api().checkRelease();
+            void pullPaths();
           }, 10 * 60 * 1000);
+          window.setInterval(() => {
+            void pullPaths();
+          }, 20 * 1000);
           window.addEventListener("focus", () => {
             void api().checkRelease();
+            void pullPaths();
           });
         }
         void get().checkRelease();
@@ -304,10 +323,7 @@ export const useDesk = create<State>((set, get) => {
       if ("error" in result) return result.error;
       const data = withStandardTools(result.data);
       set({ user: result.user, data, view: "today", editorId: null, phase: "saved" });
-      if (data !== result.data) {
-        void enqueue("auto");
-        if (data.tools.length !== result.data.tools.length) get().showToast("AX, Infotrack and Kindertons are in the tool library.");
-      }
+      if (data !== result.data) void enqueue("auto");
       void get().checkRelease();
       return null;
     },
@@ -316,10 +332,7 @@ export const useDesk = create<State>((set, get) => {
       if ("error" in result) return result.error;
       const data = withStandardTools(result.data);
       set({ user: result.user, data, view: "today", editorId: null, phase: "saved" });
-      if (data !== result.data) {
-        void enqueue("auto");
-        if (data.tools.length !== result.data.tools.length) get().showToast("AX, Infotrack and Kindertons are in the tool library.");
-      }
+      if (data !== result.data) void enqueue("auto");
       void get().checkRelease();
       return null;
     },
@@ -742,6 +755,7 @@ export const useDesk = create<State>((set, get) => {
       });
     },
     setLookupPath: (toolId, sourceId, path) => {
+      markPathsDirty();
       edit((data) => {
         const tool = data.tools.find((item) => item.id === toolId);
         if (!tool) return;

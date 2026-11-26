@@ -44,6 +44,40 @@ const memoryBlobs = new Map<string, StoredBlob>();
 let session: Session | null = null;
 let latestJson = "";
 let lastSnapshot = "";
+let pathsDirty = false;
+
+export function markPathsDirty() {
+  pathsDirty = true;
+}
+
+export function pathsAwaitingSave() {
+  return pathsDirty;
+}
+
+export async function readSharedDesk(): Promise<DeskData | null> {
+  if (!session) return null;
+  try {
+    const envelope = await collect();
+    if (!envelope) return null;
+    return await decryptData(session.master, envelope);
+  } catch {
+    return null;
+  }
+}
+
+export function applySharedPaths(local: DeskData, shared: DeskData): boolean {
+  let changed = false;
+  for (const tool of local.tools) {
+    const remote = shared.tools.find((item) => item.id === tool.id);
+    if (!remote) continue;
+    const left = JSON.stringify(tool.lookups ?? []);
+    const right = JSON.stringify(remote.lookups ?? []);
+    if (left === right) continue;
+    tool.lookups = remote.lookups?.length ? remote.lookups.map((item) => ({ ...item })) : undefined;
+    changed = true;
+  }
+  return changed;
+}
 
 function parseEnvelope(json: string | null): Envelope | null {
   if (!json) return null;
@@ -319,6 +353,10 @@ export async function persist(
   reason: "auto" | "manual" | "checkpoint" | "close",
 ): Promise<{ ok: boolean; savedAt: string | null; message: string; inSync: boolean }> {
   if (!session) return { ok: false, savedAt: null, message: "Not signed in.", inSync: false };
+  if (!pathsDirty) {
+    const shared = await readSharedDesk();
+    if (shared) applySharedPaths(data, shared);
+  }
   const snapshot = JSON.stringify(data);
   if (snapshot === lastSnapshot && reason === "auto") {
     return { ok: true, savedAt: null, message: "Both copies match.", inSync: true };
@@ -327,6 +365,7 @@ export async function persist(
     const json = await seal(data);
     const written = await writeSinks(json, data);
     lastSnapshot = snapshot;
+    pathsDirty = false;
     const savedAt = new Date().toISOString();
     return { ok: true, savedAt, message: written.message, inSync: written.inSync };
   } catch {

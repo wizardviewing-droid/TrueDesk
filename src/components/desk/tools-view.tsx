@@ -141,8 +141,13 @@ function SourcePath({
 }) {
   const saved = tool.lookups?.find((item) => item.id === sourceId)?.path ?? "";
   const [path, setPath] = useState(saved);
+  const [focused, setFocused] = useState(false);
   const [linked, setLinked] = useState("");
   const [note, setNote] = useState("");
+
+  useEffect(() => {
+    if (!focused) setPath(saved);
+  }, [saved, focused]);
 
   useEffect(() => {
     void sourceFolderName(tool.id, sourceId).then((name) => setLinked(name ?? ""));
@@ -151,15 +156,19 @@ function SourcePath({
   return (
     <div className="rounded-md border border-line px-4 py-3">
       <p className="font-semibold text-navy">Looking for: {title}</p>
-      <p className="mt-1 text-sm text-muted">{detail} In the Windows app this path is read directly. In the browser, link the folder as well.</p>
+      <p className="mt-1 text-sm text-muted">{detail} The path is saved on the shared drive, so every desk uses the same file.</p>
       <label className="mt-3 block">
         <span className="label">Path</span>
         <input
           className="input"
           value={path}
           placeholder="Y:\accounts\..."
+          onFocus={() => setFocused(true)}
           onChange={(event) => setPath(event.target.value)}
-          onBlur={() => onPath(tool.id, sourceId, path)}
+          onBlur={() => {
+            setFocused(false);
+            onPath(tool.id, sourceId, path);
+          }}
         />
       </label>
       <div className="mt-2 flex flex-wrap items-center gap-3">
