@@ -132,8 +132,9 @@ export function buildWorkbook(data: DeskData): Uint8Array {
       message: item.message,
       at: item.at,
       read: item.read ? "yes" : "",
+      kind: item.kind === "desk" ? "desk" : "rejected",
     })),
-    ["id", "userId", "taskId", "message", "at", "read"],
+    ["id", "userId", "taskId", "message", "at", "read", "kind"],
   );
   addSheet(
     wb,
@@ -266,6 +267,7 @@ export function parseWorkbook(bytes: ArrayBuffer | Uint8Array): DeskData {
       message: text(row.message),
       at: text(row.at),
       read: text(row.read) === "yes",
+      kind: text(row.kind) === "desk" ? ("desk" as const) : ("rejected" as const),
     }))
     .filter((item) => item.id && item.userId && item.message);
 

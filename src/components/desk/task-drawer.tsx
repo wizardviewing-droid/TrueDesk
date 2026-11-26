@@ -28,7 +28,9 @@ export function TaskDrawer() {
   const hint =
     task.assigneeId === user.id
       ? "This sits on your own desk."
-      : `${assignee?.name ?? "They"} will be asked to accept it. If they reject it, it comes back to you.`;
+      : user.role === "manager"
+        ? `${assignee?.name ?? "They"} will be told it is on their desk. They cannot send it back.`
+        : `${assignee?.name ?? "They"} will be asked to accept it. If they reject it, it comes back to you.`;
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end bg-navy/35" onClick={() => openTask(null)}>

@@ -207,6 +207,33 @@ function taskById(data: DeskData, id: string) {
   return data.tasks.find((task) => task.id === id);
 }
 
+function handOver(data: DeskData, task: Task, actor: User): "own" | "manager" | "ask" {
+  if (!data.notices) data.notices = [];
+  if (task.assigneeId === actor.id) {
+    task.status = "accepted";
+    task.managerAssigned = false;
+    return "own";
+  }
+  if (actor.role === "manager") {
+    task.status = "accepted";
+    task.managerAssigned = true;
+    task.returnNote = "";
+    data.notices.unshift({
+      id: crypto.randomUUID(),
+      userId: task.assigneeId,
+      taskId: task.id,
+      message: `${actor.name} put “${task.title}” on your desk.`,
+      at: new Date().toISOString(),
+      read: false,
+      kind: "desk",
+    });
+    return "manager";
+  }
+  task.status = "pending";
+  task.managerAssigned = false;
+  return "ask";
+}
+
 export const useDesk = create<State>((set, get) => {
   api = get;
   return {
@@ -329,7 +356,6 @@ export const useDesk = create<State>((set, get) => {
       if (!user) return null;
       const now = new Date().toISOString();
       const assigneeId = partial.assigneeId || user.id;
-      const manager = false;
       const id = crypto.randomUUID();
       const task: Task = {
         id,
@@ -338,13 +364,13 @@ export const useDesk = create<State>((set, get) => {
         client: partial.client ?? "",
         practice: partial.practice || "Personal injury",
         priority: partial.priority || "normal",
-        status: assigneeId === user.id || manager ? "accepted" : "pending",
+        status: "accepted",
         date: partial.date ?? todayISO(),
         time: partial.time ?? "",
         ownerId: user.id,
         assigneeId,
         assignerId: user.id,
-        managerAssigned: manager,
+        managerAssigned: false,
         returnNote: "",
         createdAt: now,
         updatedAt: now,
@@ -354,14 +380,16 @@ export const useDesk = create<State>((set, get) => {
       edit((data) => {
         data.tasks.unshift(task);
         const assignee = data.users.find((item) => item.id === assigneeId);
+        const placed = handOver(data, task, user);
+        const who = assignee?.name ?? "a colleague";
         log(
           data,
           user.id,
-          assigneeId === user.id
+          placed === "own"
             ? `${user.name} added “${task.title}”.`
-            : manager
-              ? `${user.name} put “${task.title}” on ${assignee?.name ?? "a colleague"}'s desk.`
-              : `${user.name} asked ${assignee?.name ?? "a colleague"} to accept “${task.title}”.`,
+            : placed === "manager"
+              ? `${user.name} put “${task.title}” on ${who}'s desk.`
+              : `${user.name} asked ${who} to accept “${task.title}”.`,
           id,
         );
       });
@@ -387,14 +415,14 @@ export const useDesk = create<State>((set, get) => {
         task.assignerId = user.id;
         task.updatedAt = new Date().toISOString();
         task.completedAt = "";
-        if (assigneeId === user.id) {
-          task.status = "accepted";
-          task.managerAssigned = false;
+        const placed = handOver(data, task, user);
+        if (placed === "own") {
           log(data, user.id, `${user.name} kept “${task.title}” on their own desk.`, id);
           toast = "Kept on your desk.";
+        } else if (placed === "manager") {
+          log(data, user.id, `${user.name} put “${task.title}” on ${assignee.name}'s desk.`, id);
+          toast = `On ${assignee.name}'s desk. They have been told.`;
         } else {
-          task.status = "pending";
-          task.managerAssigned = false;
           log(data, user.id, `${user.name} asked ${assignee.name} to accept “${task.title}”.`, id);
           toast = `Asked ${assignee.name} to accept it.`;
         }
@@ -496,6 +524,7 @@ export const useDesk = create<State>((set, get) => {
           message: `${user.name} rejected “${task.title}”. It is back on your desk.`,
           at: new Date().toISOString(),
           read: false,
+          kind: "rejected",
         });
         log(data, user.id, `${user.name} rejected “${task.title}”.`, id);
       });
@@ -595,7 +624,7 @@ export const useDesk = create<State>((set, get) => {
       const other = assigneeId !== user.id;
       const who = assignee?.name;
       if (first) set({ editorId: first });
-      if (other) get().showToast(`Sent to ${who ?? "them"} to accept.`);
+      if (other) get().showToast(user.role === "manager" ? `On ${who ?? "their"} desk.` : `Sent to ${who ?? "them"} to accept.`);
       else if (files.length > 1) get().showToast(`${files.length} tasks added from files.`);
     },
     downloadAttachment: async (id) => {

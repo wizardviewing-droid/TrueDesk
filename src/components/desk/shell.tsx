@@ -197,7 +197,7 @@ export function Shell() {
           </div>
         ) : null}
         {unread.map((notice) => (
-          <div key={notice.id} className="flex flex-wrap items-center justify-between gap-3 bg-coral-soft px-4 py-3 text-navy">
+          <div key={notice.id} className={cx("flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-navy", notice.kind === "desk" ? "bg-gold" : "bg-coral-soft")}>
             <p className="font-semibold">{notice.message}</p>
             <span className="flex gap-2">
               {notice.taskId ? (

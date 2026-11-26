@@ -118,6 +118,7 @@ export type Notice = {
   message: string;
   at: string;
   read: boolean;
+  kind?: "desk" | "rejected";
 };
 
 export type DeskData = {
