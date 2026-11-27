@@ -12,6 +12,7 @@ export type ToolKind =
   | "ax"
   | "infotrack"
   | "kindertons"
+  | "letters"
   | "custom";
 export type CustomMode = "sum-by" | "add-days" | "dedupe";
 export type View = "today" | "calendar" | "register" | "tools" | "people";

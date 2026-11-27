@@ -5,7 +5,9 @@ import { MACRO_NEEDS } from "@/lib/desk/sources";
 import { useDesk } from "@/lib/desk/store";
 import { downloadBytes, bytesToBase64, openOutlook, resultWorkbook, runTool, XLSX_MIME, type MailDraft, type ToolResult } from "@/lib/desk/tools-run";
 import type { DeskTool } from "@/lib/desk/types";
-import { filesFromPath, pickFilePath } from "@/lib/desk/desktop";
+import { filesFromPath, pickFilePath, pickFolderPath } from "@/lib/desk/desktop";
+import { LettersDesk } from "@/components/desk/letters-view";
+import { LETTER_PATHS } from "@/lib/desk/letters";
 import { sourceFolderFiles } from "@/lib/desk/storage";
 
 export function ToolsView() {
@@ -65,14 +67,15 @@ function ToolSettings({
   onClose: () => void;
   onSave: (paths: Record<string, string>) => void;
 }) {
-  const needs = tool.kind === "ax" || tool.kind === "infotrack" || tool.kind === "kindertons" ? MACRO_NEEDS[tool.kind] : [];
+  const needs = tool.kind === "ax" || tool.kind === "infotrack" || tool.kind === "kindertons" || tool.kind === "letters" ? MACRO_NEEDS[tool.kind] : [];
   const [paths, setPaths] = useState<Record<string, string>>(() =>
-    Object.fromEntries(needs.map((need) => [need.id, tool.lookups?.find((item) => item.id === need.id)?.path ?? ""])),
+    Object.fromEntries(needs.map((need) => [need.id, tool.lookups?.find((item) => item.id === need.id)?.path || LETTER_PATHS[need.id] || ""])),
   );
   const [note, setNote] = useState("");
 
   async function choose(sourceId: string) {
-    const picked = await pickFilePath();
+    const folder = needs.find((need) => need.id === sourceId)?.folder;
+    const picked = folder ? await pickFolderPath() : await pickFilePath();
     if (picked === "cancel") return;
     if (picked === "unavailable") {
       setNote("Select location works in the Windows app. You can still paste a path.");
@@ -111,7 +114,7 @@ function ToolSettings({
                 onChange={(event) => setPaths((current) => ({ ...current, [need.id]: event.target.value }))}
               />
             </label>
-            <button type="button" className="btn btn-navy mt-3" onClick={() => void choose(need.id)}>Select location</button>
+            <button type="button" className="btn btn-navy mt-3" onClick={() => void choose(need.id)}>{need.folder ? "Select folder" : "Select location"}</button>
           </div>
         )) : (
           <p className="text-sm text-muted">This tool has no file paths to set.</p>
@@ -130,7 +133,7 @@ function toolLook(kind: string): { wash: string; ink: string; chip: string; eyeb
   if (kind === "ax") return { wash: "from-[#0c1c4d] via-[#16356f] to-[#1e4f8a]", ink: "text-paper", chip: "bg-[#1e4f8a]", eyebrow: "Remittance" };
   if (kind === "infotrack") return { wash: "from-[#0c4f4a] via-[#0f6e66] to-[#1a9488]", ink: "text-paper", chip: "bg-[#0f6e66]", eyebrow: "Ledgers" };
   if (kind === "kindertons") return { wash: "from-[#fff1c2] via-[#f0c14a] to-[#e2ae32]", ink: "text-navy", chip: "bg-[#e2ae32]", eyebrow: "Court fees" };
-  if (kind === "limitation") return { wash: "from-[#fdeceb] via-[#f8d5d1] to-[#f3c2bb]", ink: "text-navy", chip: "bg-[#e7a197]", eyebrow: "Limitation" };
+  if (kind === "letters") return { wash: "from-[#14361f] via-[#1f6b3a] to-[#2f9a55]", ink: "text-paper", chip: "bg-[#1f6b3a]", eyebrow: "Letters" };
   return { wash: "from-[#eef6ff] via-[#f6f1ff] to-[#fff6dc]", ink: "text-navy", chip: "bg-[#d9ebff]", eyebrow: "Desk tool" };
 }
 
@@ -213,7 +216,8 @@ function Runner({ tool, onPin, onRemove, onSettings }: { tool: DeskTool; onPin: 
         </div>
       </div>
       <div className="grid gap-4 px-5 py-5">
-        {tool.kind === "limitation" ? (
+        {tool.kind === "letters" ? <LettersDesk tool={tool} /> : null}
+        {tool.kind === "letters" ? null : tool.kind === "limitation" ? (
           <div className="grid gap-3 sm:grid-cols-3">
             <label>
               <span className="label">Accident date</span>
@@ -229,6 +233,8 @@ function Runner({ tool, onPin, onRemove, onSettings }: { tool: DeskTool; onPin: 
             </label>
           </div>
         ) : null}
+        {tool.kind === "letters" ? null : (
+        <>
         <div className="flex flex-wrap gap-2">
           <button type="button" className="btn btn-gold" disabled={busy || (macro && !files.length)} onClick={() => void run(false)}>
             {busy ? "Working…" : files.length || accident ? "Run and build workbook" : macro ? "Drop a file first" : "Run the sample"}
@@ -285,6 +291,8 @@ function Runner({ tool, onPin, onRemove, onSettings }: { tool: DeskTool; onPin: 
                 : "The desk writes a finished workbook you can download."}
         </p>
         {result ? <ResultCard result={result} name={tool.name} onComplete={finish} /> : null}
+        </>
+        )}
       </div>
     </section>
   );

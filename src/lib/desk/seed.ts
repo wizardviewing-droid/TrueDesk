@@ -33,6 +33,17 @@ export function buildSeed(): DeskData {
         kind: "kindertons",
         pinned: false,
       },
+      {
+        id: "tool-letters",
+        name: "Letters and SF bills",
+        description: "Save today's matter numbers, then email the letter and success fee bill for each one.",
+        kind: "letters",
+        pinned: false,
+        lookups: [
+          { id: "bills", path: "Y:\\accounts\\success fee bills\\" },
+          { id: "lists", path: "Y:\\accounts\\Tools\\Task application" },
+        ],
+      },
     ],
     activity: [],
     notices: [],

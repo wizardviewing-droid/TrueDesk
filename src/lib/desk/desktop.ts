@@ -3,6 +3,11 @@ export type DesktopFile = { name: string; base64: string };
 type DesktopApi = {
   readSpreadsheets: (target: string) => Promise<DesktopFile[]>;
   pickFile: () => Promise<string | null>;
+  pickFolder?: () => Promise<string | null>;
+  lettersList?: (root: string) => Promise<{ name: string; path: string; year: string; month: string }[]>;
+  lettersDir?: (folder: string) => Promise<{ name: string; path: string }[]>;
+  lettersWrite?: (payload: { root: string; year?: string; month?: string; name?: string; filePath?: string; base64: string }) => Promise<string>;
+  lettersRename?: (payload: { root: string; filePath: string }) => Promise<string>;
   openOutlook: (payload: {
     to: string;
     cc: string;
@@ -11,6 +16,7 @@ type DesktopApi = {
     username: string;
     fileName: string;
     fileBase64: string;
+    files?: string[];
   }) => Promise<void>;
   openFile: (username: string, name: string, base64: string) => Promise<void>;
 };
@@ -18,6 +24,14 @@ type DesktopApi = {
 export function desktopApi(): DesktopApi | null {
   if (typeof window === "undefined") return null;
   return window.trueDesk ?? null;
+}
+
+export async function pickFolderPath(): Promise<{ path: string } | "cancel" | "unavailable"> {
+  const api = desktopApi();
+  if (!api?.pickFolder) return "unavailable";
+  const picked = await api.pickFolder();
+  if (typeof picked !== "string" || !picked.trim()) return "cancel";
+  return { path: picked };
 }
 
 export async function pickFilePath(): Promise<{ path: string } | "cancel" | "unavailable"> {

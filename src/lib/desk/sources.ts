@@ -2,9 +2,10 @@ export type MacroNeed = {
   id: string;
   title: string;
   detail: string;
+  folder?: boolean;
 };
 
-export const MACRO_NEEDS: Record<"ax" | "infotrack" | "kindertons", MacroNeed[]> = {
+export const MACRO_NEEDS: Record<"ax" | "infotrack" | "kindertons" | "letters", MacroNeed[]> = {
   ax: [
     {
       id: "cases",
@@ -25,4 +26,23 @@ export const MACRO_NEEDS: Record<"ax" | "infotrack" | "kindertons", MacroNeed[]>
     },
   ],
   infotrack: [],
+  letters: [
+    {
+      id: "bills",
+      title: "Letters and bills",
+      detail: "Where the Word letters and the success fee bills are saved. The usual folder is Y:\\accounts\\success fee bills\\",
+      folder: true,
+    },
+    {
+      id: "lists",
+      title: "Saved lists",
+      detail: "Where today's matter list is saved, in a year folder and a month folder. The usual folder is Y:\\accounts\\Tools\\Task application",
+      folder: true,
+    },
+    {
+      id: "emails",
+      title: "Email list",
+      detail: "The workbook with the Data1 sheet. Column A is the matter number and column B is the email address.",
+    },
+  ],
 };

@@ -3,6 +3,11 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("trueDesk", {
   readSpreadsheets: (target) => ipcRenderer.invoke("read-spreadsheets", target),
   pickFile: () => ipcRenderer.invoke("pick-file"),
+  pickFolder: () => ipcRenderer.invoke("pick-folder"),
+  lettersList: (root) => ipcRenderer.invoke("letters-list", root),
+  lettersDir: (folder) => ipcRenderer.invoke("letters-dir", folder),
+  lettersWrite: (payload) => ipcRenderer.invoke("letters-write", payload),
+  lettersRename: (payload) => ipcRenderer.invoke("letters-rename", payload),
   focusWindow: () => ipcRenderer.invoke("focus-window"),
   clearAttention: () => ipcRenderer.invoke("clear-attention"),
   openOutlook: (payload) => ipcRenderer.invoke("open-outlook", payload),

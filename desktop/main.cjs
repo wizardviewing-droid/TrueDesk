@@ -72,6 +72,109 @@ function createWindow() {
   void window.loadURL(`http://127.0.0.1:${PORT}/`);
 }
 
+ipcMain.handle("pick-folder", async () => {
+  const parent = BrowserWindow.getFocusedWindow();
+  const result = await dialog.showOpenDialog(parent ?? undefined, {
+    title: "Select the folder",
+    properties: ["openDirectory"],
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  return result.filePaths[0];
+});
+
+function assertDeskPath(value) {
+  if (typeof value !== "string") throw new Error("That path is not usable.");
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 400 || /[\u0000-\u001f]/.test(trimmed)) throw new Error("That path is not usable.");
+  return path.resolve(trimmed);
+}
+
+function insideRoot(root, target) {
+  const base = assertDeskPath(root);
+  const file = assertDeskPath(target);
+  const prefix = base.endsWith(path.sep) ? base : base + path.sep;
+  if (file.toLowerCase() !== base.toLowerCase() && !file.toLowerCase().startsWith(prefix.toLowerCase())) {
+    throw new Error("That file is outside the saved lists folder.");
+  }
+  return file;
+}
+
+ipcMain.handle("letters-list", async (_event, root) => {
+  const base = assertDeskPath(root);
+  let years = [];
+  try {
+    years = await fs.promises.readdir(base, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const found = [];
+  for (const year of years) {
+    if (!year.isDirectory() || !/^(19|20)\d{2}$/.test(year.name)) continue;
+    const yearPath = path.join(base, year.name);
+    const months = await fs.promises.readdir(yearPath, { withFileTypes: true });
+    for (const month of months) {
+      if (!month.isDirectory()) continue;
+      const monthPath = path.join(yearPath, month.name);
+      const files = await fs.promises.readdir(monthPath, { withFileTypes: true });
+      for (const file of files) {
+        if (!file.isFile() || !/\.xlsx?$/i.test(file.name) && !/\.xlsm$/i.test(file.name)) continue;
+        if (/^sent\b/i.test(file.name)) continue;
+        found.push({ name: file.name, path: path.join(monthPath, file.name), year: year.name, month: month.name });
+      }
+    }
+  }
+  found.sort((a, b) => a.path.localeCompare(b.path));
+  return found;
+});
+
+ipcMain.handle("letters-dir", async (_event, folder) => {
+  const base = assertDeskPath(folder);
+  const names = await fs.promises.readdir(base);
+  return names.slice(0, 20000).map((name) => ({ name, path: path.join(base, name) }));
+});
+
+ipcMain.handle("letters-write", async (_event, payload) => {
+  if (!payload || typeof payload !== "object") throw new Error("That list could not be saved.");
+  const folder = payload.filePath ? path.dirname(insideRoot(payload.root, payload.filePath)) : path.join(assertDeskPath(payload.root), String(payload.year || ""), String(payload.month || ""));
+  if (!payload.filePath) {
+    if (!/^(19|20)\d{2}$/.test(String(payload.year || ""))) throw new Error("That year is not usable.");
+    if (!/^[A-Za-z]+$/.test(String(payload.month || ""))) throw new Error("That month is not usable.");
+  }
+  await fs.promises.mkdir(folder, { recursive: true });
+  const packed = String(payload.base64 || "");
+  if (!packed || packed.length > 20_000_000) throw new Error("That list could not be saved.");
+  const bytes = Buffer.from(packed, "base64");
+  if (payload.filePath) {
+    const dest = insideRoot(payload.root, payload.filePath);
+    await fs.promises.writeFile(dest, bytes);
+    return dest;
+  }
+  const raw = path.basename(String(payload.name || "list.xlsx")).replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_");
+  let dest = path.join(folder, raw || "list.xlsx");
+  let extra = 2;
+  while (fs.existsSync(dest)) {
+    const stem = raw.replace(/\.xlsx$/i, "");
+    dest = path.join(folder, `${stem} (${extra}).xlsx`);
+    extra += 1;
+  }
+  await fs.promises.writeFile(dest, bytes);
+  return dest;
+});
+
+ipcMain.handle("letters-rename", async (_event, payload) => {
+  const dest = insideRoot(payload.root, payload.filePath);
+  const base = path.basename(dest);
+  if (/^sent\b/i.test(base)) return dest;
+  let next = path.join(path.dirname(dest), `SENT ${base}`);
+  let extra = 2;
+  while (fs.existsSync(next)) {
+    next = path.join(path.dirname(dest), `SENT (${extra}) ${base}`);
+    extra += 1;
+  }
+  await fs.promises.rename(dest, next);
+  return next;
+});
+
 ipcMain.handle("pick-file", async () => {
   const parent = BrowserWindow.getFocusedWindow();
   const result = await dialog.showOpenDialog(parent ?? undefined, {
@@ -105,6 +208,12 @@ ipcMain.handle("open-outlook", async (_event, payload) => {
   const cc = String(payload.cc || "").replace(/[\r\n]/g, "").slice(0, 2000);
   const subject = String(payload.subject || "").slice(0, 500);
   const body = String(payload.body || "").slice(0, 8000);
+  const files = [];
+  if (Array.isArray(payload.files)) {
+    for (const item of payload.files) {
+      if (typeof item === "string" && item.trim() && item.length < 400) files.push(item.trim());
+    }
+  }
   let filePath = "";
   if (payload.fileBase64 && payload.fileName && payload.username) {
     const folder = path.join(userFolder(APPLICATION, assertUsername(String(payload.username))), "opened");
@@ -114,15 +223,19 @@ ipcMain.handle("open-outlook", async (_event, payload) => {
     const packed = String(payload.fileBase64);
     if (packed.length > 56_000_000) throw new Error("That file is too large to attach.");
     await fs.promises.writeFile(filePath, Buffer.from(packed, "base64"));
+    files.push(filePath);
   }
-  const opened = await outlookMessage({ to, cc, subject, body, filePath });
+  const listPath = path.join(os.tmpdir(), `true-desk-mail-${Date.now()}.txt`);
+  await fs.promises.writeFile(listPath, files.join("\n"), "utf8");
+  const opened = await outlookMessage({ to, cc, subject, body, listPath });
+  await fs.promises.unlink(listPath).catch(() => {});
   if (opened) return;
   const parts = [`subject=${encodeURIComponent(subject)}`, `body=${encodeURIComponent(body)}`];
   if (cc) parts.unshift(`cc=${encodeURIComponent(cc)}`);
   await shell.openExternal(`mailto:${to}?${parts.join("&")}`);
 });
 
-function outlookMessage({ to, cc, subject, body, filePath }) {
+function outlookMessage({ to, cc, subject, body, listPath }) {
   return new Promise((resolve) => {
     const script = [
       "$ErrorActionPreference = 'Stop'",
@@ -132,11 +245,13 @@ function outlookMessage({ to, cc, subject, body, filePath }) {
       "if ($env:TD_CC) { $mail.CC = $env:TD_CC }",
       "$mail.Subject = $env:TD_SUBJECT",
       "$mail.Body = $env:TD_BODY",
-      "if ($env:TD_FILE -and (Test-Path -LiteralPath $env:TD_FILE)) { $null = $mail.Attachments.Add($env:TD_FILE) }",
+      "if ($env:TD_LIST -and (Test-Path -LiteralPath $env:TD_LIST)) {",
+      "  Get-Content -LiteralPath $env:TD_LIST | ForEach-Object { if ($_ -and (Test-Path -LiteralPath $_)) { $null = $mail.Attachments.Add($_) } }",
+      "}",
       "$mail.Display()",
     ].join("; ");
     const child = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], {
-      env: { ...process.env, TD_TO: to, TD_CC: cc, TD_SUBJECT: subject, TD_BODY: body, TD_FILE: filePath },
+      env: { ...process.env, TD_TO: to, TD_CC: cc, TD_SUBJECT: subject, TD_BODY: body, TD_LIST: listPath },
       windowsHide: true,
     });
     child.on("error", () => resolve(false));

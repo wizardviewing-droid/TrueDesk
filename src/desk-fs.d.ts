@@ -18,6 +18,11 @@ declare global {
     trueDesk?: {
       readSpreadsheets: (target: string) => Promise<{ name: string; base64: string }[]>;
       pickFile: () => Promise<string | null>;
+      pickFolder?: () => Promise<string | null>;
+      lettersList?: (root: string) => Promise<{ name: string; path: string; year: string; month: string }[]>;
+      lettersDir?: (folder: string) => Promise<{ name: string; path: string }[]>;
+      lettersWrite?: (payload: { root: string; year?: string; month?: string; name?: string; filePath?: string; base64: string }) => Promise<string>;
+      lettersRename?: (payload: { root: string; filePath: string }) => Promise<string>;
       focusWindow?: () => Promise<void>;
       clearAttention?: () => Promise<void>;
       openOutlook: (payload: {
@@ -28,6 +33,7 @@ declare global {
         username: string;
         fileName: string;
         fileBase64: string;
+        files?: string[];
       }) => Promise<void>;
       openFile: (username: string, name: string, base64: string) => Promise<void>;
       openMail?: (username: string, name: string, base64: string) => Promise<void>;
