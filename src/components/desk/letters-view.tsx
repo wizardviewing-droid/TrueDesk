@@ -31,7 +31,9 @@ function sheetRows(bytes: ArrayBuffer, preferred: string): string[][] {
 function listBytes(rows: string[][]): Uint8Array {
   const book = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet(rows), "Matters");
-  const out = XLSX.write(book, { type: "array", bookType: "xlsx" }) as number[];
+  const out = XLSX.write(book, { type: "array", bookType: "xlsx" }) as ArrayBuffer | Uint8Array | number[];
+  if (out instanceof ArrayBuffer) return new Uint8Array(out);
+  if (ArrayBuffer.isView(out)) return new Uint8Array(out.buffer, out.byteOffset, out.byteLength);
   return Uint8Array.from(out);
 }
 
@@ -193,11 +195,11 @@ export function LettersDesk({ tool }: { tool: DeskTool }) {
     const api = desktopApi();
     const filled = lines.filter((line) => line.matter.trim());
     if (!api?.lettersWrite) {
-      setNote("Saving a list works in the Windows app.");
+      showToast("Saving a list works in the Windows app. Close it and open it again so it can update.");
       return;
     }
     if (!filled.length) {
-      setNote("Enter at least one matter number.");
+      showToast("Enter at least one matter number.");
       return;
     }
     setBusy("Saving…");
@@ -211,11 +213,17 @@ export function LettersDesk({ tool }: { tool: DeskTool }) {
         name: stamp.name,
         base64: bytesToBase64(listBytes(sheetFrom(lines))),
       });
-      await refresh();
       setSelected(saved);
-      showToast(`Saved ${saved.split(/[/\\]/).pop() ?? "the list"}.`);
+      showToast(`Saved ${saved}`);
+      try {
+        await refresh();
+      } catch {
+        setNote("The list was saved, but the outstanding list could not be refreshed.");
+      }
     } catch (error) {
-      setNote(error instanceof Error ? error.message : "That list could not be saved.");
+      const message = error instanceof Error ? error.message : "That list could not be saved.";
+      setNote(message);
+      showToast(message);
     }
     setBusy("");
   }
