@@ -52,8 +52,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          tag=v1.0.12
-          notes="Windows app for the accounts desk. Unzip TrueDesk.zip and open TrueDesk.exe. Task rows are shorter. Reschedule and reallocate open only when you press them."
+          tag=v1.0.13
+          notes="Windows app for the accounts desk. Unzip TrueDesk.zip and open TrueDesk.exe. Tool paths use Select location to pick the spreadsheet."
           for i in 1 2 3 4 5 6; do
             if gh release view "$tag" >/dev/null 2>&1; then
               break

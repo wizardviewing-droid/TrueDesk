@@ -2,6 +2,7 @@ export type DesktopFile = { name: string; base64: string };
 
 type DesktopApi = {
   readSpreadsheets: (target: string) => Promise<DesktopFile[]>;
+  pickFile: () => Promise<string | null>;
   openOutlook: (url: string) => Promise<void>;
   openFile: (name: string, base64: string) => Promise<void>;
 };
@@ -9,6 +10,14 @@ type DesktopApi = {
 export function desktopApi(): DesktopApi | null {
   if (typeof window === "undefined") return null;
   return window.trueDesk ?? null;
+}
+
+export async function pickFilePath(): Promise<{ path: string } | "cancel" | "unavailable"> {
+  const api = desktopApi();
+  if (!api?.pickFile) return "unavailable";
+  const picked = await api.pickFile();
+  if (typeof picked !== "string" || !picked.trim()) return "cancel";
+  return { path: picked };
 }
 
 export async function filesFromPath(target: string): Promise<File[]> {

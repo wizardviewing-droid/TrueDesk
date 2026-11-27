@@ -17,6 +17,7 @@ declare global {
     }): Promise<FileSystemDirectoryHandle>;
     trueDesk?: {
       readSpreadsheets: (target: string) => Promise<{ name: string; base64: string }[]>;
+      pickFile: () => Promise<string | null>;
       openOutlook: (url: string) => Promise<void>;
       openFile: (name: string, base64: string) => Promise<void>;
       readVault: () => Promise<{ json: string | null; application: boolean; backup: boolean }>;

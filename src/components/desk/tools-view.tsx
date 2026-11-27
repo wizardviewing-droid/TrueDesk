@@ -5,8 +5,8 @@ import { MACRO_NEEDS } from "@/lib/desk/sources";
 import { useDesk } from "@/lib/desk/store";
 import { downloadBytes, openOutlook, resultWorkbook, runTool, XLSX_MIME, type ToolResult } from "@/lib/desk/tools-run";
 import type { CustomMode, DeskTool } from "@/lib/desk/types";
-import { filesFromPath } from "@/lib/desk/desktop";
-import { linkSourceFolder, sourceFolderFiles, sourceFolderName } from "@/lib/desk/storage";
+import { filesFromPath, pickFilePath } from "@/lib/desk/desktop";
+import { sourceFolderFiles } from "@/lib/desk/storage";
 
 export function ToolsView() {
   const data = useDesk((s) => s.data);
@@ -142,16 +142,24 @@ function SourcePath({
   const saved = tool.lookups?.find((item) => item.id === sourceId)?.path ?? "";
   const [path, setPath] = useState(saved);
   const [focused, setFocused] = useState(false);
-  const [linked, setLinked] = useState("");
   const [note, setNote] = useState("");
 
   useEffect(() => {
     if (!focused) setPath(saved);
   }, [saved, focused]);
 
-  useEffect(() => {
-    void sourceFolderName(tool.id, sourceId).then((name) => setLinked(name ?? ""));
-  }, [tool.id, sourceId]);
+  async function choose() {
+    const picked = await pickFilePath();
+    if (picked === "cancel") return;
+    if (picked === "unavailable") {
+      setNote("Select location works in the Windows app. You can still paste a path.");
+      return;
+    }
+    setPath(picked.path);
+    setFocused(false);
+    setNote("");
+    onPath(tool.id, sourceId, picked.path);
+  }
 
   return (
     <div className="rounded-md border border-line px-4 py-3">
@@ -162,7 +170,7 @@ function SourcePath({
         <input
           className="input"
           value={path}
-          placeholder="Y:\accounts\..."
+          placeholder="No file selected"
           onFocus={() => setFocused(true)}
           onChange={(event) => setPath(event.target.value)}
           onBlur={() => {
@@ -171,29 +179,11 @@ function SourcePath({
           }}
         />
       </label>
-      <div className="mt-2 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          className="btn btn-quiet px-0"
-          onClick={() => {
-            void linkSourceFolder(tool.id, sourceId).then((result) => {
-              if (!result) return;
-              if ("error" in result) {
-                setNote(result.error);
-                return;
-              }
-              setLinked(result.name);
-              setNote("");
-              if (!path.trim()) {
-                setPath(result.name);
-                onPath(tool.id, sourceId, result.name);
-              }
-            });
-          }}
-        >
-          {linked ? "Choose again" : "Link folder"}
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <button type="button" className="btn btn-navy" onClick={() => void choose()}>
+          Select location
         </button>
-        <span className="text-sm text-muted">{linked ? `Linked: ${linked}` : "Not linked yet"}</span>
+        <span className="text-sm text-muted">{path.trim() ? "Saved for every desk." : "No file selected."}</span>
       </div>
       {note ? <p className="mt-1 text-sm text-muted">{note}</p> : null}
     </div>

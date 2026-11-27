@@ -64,6 +64,20 @@ function createWindow() {
   void window.loadURL(`http://127.0.0.1:${PORT}/`);
 }
 
+ipcMain.handle("pick-file", async () => {
+  const parent = BrowserWindow.getFocusedWindow();
+  const result = await dialog.showOpenDialog(parent ?? undefined, {
+    title: "Select the file",
+    properties: ["openFile"],
+    filters: [
+      { name: "Spreadsheets", extensions: ["xlsx", "xlsm", "xlsb", "xls", "csv"] },
+      { name: "All files", extensions: ["*"] },
+    ],
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  return result.filePaths[0];
+});
+
 ipcMain.handle("open-outlook", async (_event, url) => {
   if (typeof url !== "string" || !url.startsWith("mailto:")) throw new Error("Not an email link.");
   await shell.openExternal(url);
