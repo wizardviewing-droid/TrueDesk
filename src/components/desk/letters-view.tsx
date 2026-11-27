@@ -93,7 +93,6 @@ export function LettersDesk({ tool }: { tool: DeskTool }) {
   const [ran, setRan] = useState(false);
   const [note, setNote] = useState("");
   const root = lookup(tool, "lists");
-  const ready = Boolean(desktopApi()?.lettersList);
 
   function edit(index: number, patch: Partial<Line>) {
     setLines((current) => current.map((line, item) => (item === index ? { ...line, ...patch } : line)));
@@ -295,8 +294,6 @@ export function LettersDesk({ tool }: { tool: DeskTool }) {
     }
     setBusy("");
   }
-
-  if (!ready) return <p className="text-sm text-muted">This tool runs in the Windows app, where it can save to the shared drive and open Outlook.</p>;
 
   return (
     <div className="grid gap-4">

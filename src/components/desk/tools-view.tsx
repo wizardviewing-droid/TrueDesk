@@ -129,6 +129,10 @@ function ToolSettings({
   );
 }
 
+function isLetters(tool: DeskTool): boolean {
+  return tool.kind === "letters" || tool.id === "tool-letters" || /letters and sf/i.test(tool.name);
+}
+
 function toolLook(kind: string): { wash: string; ink: string; chip: string; eyebrow: string } {
   if (kind === "ax") return { wash: "from-[#0c1c4d] via-[#16356f] to-[#1e4f8a]", ink: "text-paper", chip: "bg-[#1e4f8a]", eyebrow: "Remittance" };
   if (kind === "infotrack") return { wash: "from-[#0c4f4a] via-[#0f6e66] to-[#1a9488]", ink: "text-paper", chip: "bg-[#0f6e66]", eyebrow: "Ledgers" };
@@ -183,8 +187,43 @@ function Runner({ tool, onPin, onRemove, onSettings }: { tool: DeskTool; onPin: 
     setDropKey((key) => key + 1);
   }
 
-  const look = toolLook(tool.kind);
+  const look = toolLook(isLetters(tool) ? "letters" : tool.kind);
   const manager = user?.role === "manager";
+
+  if (isLetters(tool)) {
+    return (
+      <section className="card overflow-hidden">
+        <div className={cx("relative overflow-hidden bg-linear-to-br px-6 py-6", look.wash, look.ink)}>
+          <p className="text-[11px] font-semibold tracking-[0.16em] uppercase opacity-80">{look.eyebrow}</p>
+          <h2 className="mt-1 text-3xl font-semibold">{tool.name}</h2>
+          <p className="mt-2 max-w-2xl text-sm opacity-90">Type each matter number and Y or N. Run shows a green tick or a red cross for the letter and the bill.</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button type="button" className="btn bg-card text-navy shadow-sm" onClick={onSettings}>
+              <Settings className="size-4" aria-hidden="true" />
+              Settings
+            </button>
+            <button type="button" className="btn bg-card text-navy shadow-sm" onClick={onPin}>
+              <Pin className="size-4" aria-hidden="true" />
+              {tool.pinned ? "Unpin" : "Pin to menu"}
+            </button>
+            {manager ? (
+              confirmDelete ? (
+                <>
+                  <button type="button" className="btn bg-card text-danger shadow-sm" onClick={onRemove}>Delete this tool</button>
+                  <button type="button" className="btn bg-card text-navy shadow-sm" onClick={() => setConfirmDelete(false)}>Cancel</button>
+                </>
+              ) : (
+                <button type="button" className="btn bg-card text-danger shadow-sm" onClick={() => setConfirmDelete(true)}>Delete</button>
+              )
+            ) : null}
+          </div>
+        </div>
+        <div className="px-5 py-5">
+          <LettersDesk tool={tool} />
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="card overflow-hidden">

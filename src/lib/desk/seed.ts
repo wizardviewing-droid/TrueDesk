@@ -55,7 +55,10 @@ const SAMPLE_KINDS = new Set(["limitation", "time", "bundle", "disbursement", "c
 export function withStandardTools(data: DeskData): DeskData {
   const retired = new Set(data.retiredTools ?? []);
   const kept = data.tools.filter((tool) => !SAMPLE_KINDS.has(tool.kind) && !retired.has(tool.id));
-  const ids = new Set(kept.map((tool) => tool.id));
+  const repaired = kept.map((tool) =>
+    tool.id === "tool-letters" || /letters and sf/i.test(tool.name) ? (tool.kind === "letters" ? tool : { ...tool, kind: "letters" as const }) : tool,
+  );
+  const ids = new Set(repaired.map((tool) => tool.id));
   const extra = buildSeed().tools.filter((tool) => !ids.has(tool.id) && !retired.has(tool.id));
   let users = data.users.map((user) => {
     const role = user.role as string;
@@ -66,7 +69,8 @@ export function withStandardTools(data: DeskData): DeskData {
   }
   if (!data.notices) data.notices = [];
   const rolesChanged = users.some((user, index) => user !== data.users[index]);
-  const toolsChanged = extra.length > 0 || kept.length !== data.tools.length;
+  const kindChanged = repaired.some((tool, index) => tool !== kept[index]);
+  const toolsChanged = extra.length > 0 || repaired.length !== data.tools.length || kindChanged;
   if (!toolsChanged && !rolesChanged) return data;
-  return { ...data, users, tools: extra.length ? [...kept, ...extra] : kept };
+  return { ...data, users, tools: extra.length ? [...repaired, ...extra] : repaired };
 }
