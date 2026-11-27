@@ -3,7 +3,7 @@ import { AlertTriangle, CalendarDays, ChevronRight, CircleCheck, ClipboardList, 
 import { useState } from "react";
 import { TaskActions } from "@/components/desk/task-actions";
 import { cx } from "@/lib/cx";
-import { parseISODate, todayISO, toISODate } from "@/lib/desk/dates";
+import { occursOn, parseISODate, todayISO, toISODate } from "@/lib/desk/dates";
 import { matchesQuery, priorityRank, useDesk } from "@/lib/desk/store";
 import { repeatLabel, taskRepeat, type Attachment, type Task } from "@/lib/desk/types";
 
@@ -21,12 +21,13 @@ function doneOn(stamp: string): string {
 
 function listFor(pool: Task[], lens: Lens, today: string, byWhen: (a: Task, b: Task) => number, pendingToo: boolean) {
   const live = pool.filter((task) => task.status === "accepted" || (pendingToo && task.status === "pending")).sort(byWhen);
-  const overdue = live.filter((task) => task.date && task.date < today);
-  const todayTasks = live.filter((task) => task.date === today);
+  const dueToday = (task: Task) => Boolean(task.date) && occursOn(task.date, taskRepeat(task), today);
+  const overdue = live.filter((task) => task.date && task.date < today && !dueToday(task));
+  const todayTasks = live.filter(dueToday);
   const done = pool
     .filter((task) => task.status === "done" && doneOn(task.completedAt || task.updatedAt) === today)
     .sort((a, b) => (b.completedAt || b.updatedAt).localeCompare(a.completedAt || a.updatedAt));
-  const todayOpen = live.filter((task) => task.date === today);
+  const todayOpen = todayTasks;
   const tasks = lens === "done" ? done : lens === "overdue" ? overdue : lens === "open" ? todayOpen : [...overdue, ...todayTasks];
   return { live, overdue, done, tasks, todayOpen };
 }
@@ -243,9 +244,9 @@ function Stat({
 
 function TaskRow({ task, index, today, who, files, done, onOpen, onFile }: { task: Task; index: number; today: string; who?: string; files: Attachment[]; done: boolean; onOpen: () => void; onFile: (id: string) => void }) {
   const repeat = taskRepeat(task);
-  const overdue = !done && Boolean(task.date && task.date < today);
+  const overdue = !done && Boolean(task.date && task.date < today) && !occursOn(task.date, repeat, today);
   const waiting = task.status === "pending";
-  const dueToday = !done && task.date === today;
+  const dueToday = !done && occursOn(task.date, repeat, today);
   const warm = index % 2 === 1;
   const bits = [
     task.matter,

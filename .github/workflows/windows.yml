@@ -52,8 +52,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          tag=v1.0.19
-          notes="Windows app for the accounts desk. Unzip TrueDesk.zip and open TrueDesk.exe. Emails attach a file, pinned tools sit in the menu, and the copy status is gone from the home screen."
+          tag=v1.0.20
+          notes="Windows app for the accounts desk. Unzip TrueDesk.zip and open TrueDesk.exe. Monthly tasks that land on a weekend move to the Friday, and the calendar shows UK bank holidays."
           for i in 1 2 3 4 5 6; do
             if gh release view "$tag" >/dev/null 2>&1; then
               break

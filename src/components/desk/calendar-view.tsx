@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cx } from "@/lib/cx";
 import { TaskActions } from "@/components/desk/task-actions";
-import { occursOn, parseISODate, todayISO, toISODate } from "@/lib/desk/dates";
+import { holidayOn, occursOn, parseISODate, todayISO, toISODate } from "@/lib/desk/dates";
 import { matchesQuery, useDesk } from "@/lib/desk/store";
 import { taskRepeat } from "@/lib/desk/types";
 
@@ -73,6 +73,7 @@ export function CalendarView() {
             const iso = toISODate(day);
             const inMonth = day.getMonth() === cursor.getMonth();
             const items = onDay(iso);
+            const holiday = holidayOn(iso);
             return (
               <div
                 key={iso}
@@ -97,6 +98,7 @@ export function CalendarView() {
                     {day.getDate()}
                   </span>
                 </button>
+                {holiday ? <p className="truncate px-1 text-[10px] font-semibold leading-tight text-[#9a6b00]" title={holiday}>{holiday}</p> : null}
                 <div className="mt-1 hidden flex-col gap-1 md:flex">
                   {items.slice(0, 3).map((task) => (
                     <button
@@ -128,7 +130,10 @@ export function CalendarView() {
       </section>
       <section className="card h-fit overflow-hidden">
         <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
-          <h2 className="font-semibold text-navy">{format(parseISODate(selected), "EEEE d MMMM")}</h2>
+          <div>
+            <h2 className="font-semibold text-navy">{format(parseISODate(selected), "EEEE d MMMM")}</h2>
+            {holidayOn(selected) ? <p className="text-sm font-semibold text-[#9a6b00]">{holidayOn(selected)}</p> : null}
+          </div>
           <button type="button" className="btn btn-gold" onClick={() => openCompose(selected)}>
             <Plus className="size-4" aria-hidden="true" />
             Add
