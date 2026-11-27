@@ -1,5 +1,5 @@
-import { Pin, Upload } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Pin, Settings, Upload } from "lucide-react";
+import { useState } from "react";
 import { cx } from "@/lib/cx";
 import { MACRO_NEEDS } from "@/lib/desk/sources";
 import { useDesk } from "@/lib/desk/store";
@@ -14,7 +14,10 @@ export function ToolsView() {
   const setTool = useDesk((s) => s.setTool);
   const togglePin = useDesk((s) => s.togglePin);
   const removeTool = useDesk((s) => s.removeTool);
+  const setLookupPath = useDesk((s) => s.setLookupPath);
+  const [settingsFor, setSettingsFor] = useState<string | null>(null);
   const tool = data?.tools.find((item) => item.id === toolId) ?? data?.tools[0];
+  const settingsTool = data?.tools.find((item) => item.id === settingsFor) ?? null;
   if (!data || !tool) return null;
 
   return (
@@ -23,106 +26,116 @@ export function ToolsView() {
         <h1 className="border-b border-line px-4 py-3 text-xl font-semibold text-navy">Tool library</h1>
         <ul>
           {data.tools.map((item) => (
-            <li key={item.id} className={cx("border-b border-line last:border-b-0", item.id === tool.id && "bg-gold/15")}>
-              <button type="button" className="w-full px-4 py-3 text-left" onClick={() => setTool(item.id)}>
-                <span className="block font-medium">{item.name}</span>
-                <span className="text-sm text-muted">{item.pinned ? "On the menu" : "In the library"}</span>
+            <li key={item.id} className={cx("flex items-center border-b border-line last:border-b-0", item.id === tool.id && "bg-gold/15")}>
+              <button type="button" className="min-w-0 flex-1 px-4 py-3 text-left" onClick={() => setTool(item.id)}>
+                <span className="flex items-center gap-2">
+                  <span className={cx("size-2.5 shrink-0 rounded-full", toolLook(item.kind).chip)} aria-hidden="true" />
+                  <span className="truncate font-medium">{item.name}</span>
+                </span>
+                <span className="pl-4 text-sm text-muted">{item.pinned ? "On the menu" : "In the library"}</span>
+              </button>
+              <button type="button" className="btn btn-quiet mr-2 min-w-11 px-3" aria-label={`Settings for ${item.name}`} onClick={() => setSettingsFor(item.id)}>
+                <Settings className="size-4" aria-hidden="true" />
               </button>
             </li>
           ))}
         </ul>
       </aside>
-      <Runner key={tool.id} tool={tool} onPin={() => togglePin(tool.id)} onRemove={() => removeTool(tool.id)} />
+      <Runner key={tool.id} tool={tool} onPin={() => togglePin(tool.id)} onRemove={() => removeTool(tool.id)} onSettings={() => setSettingsFor(tool.id)} />
+      {settingsTool ? (
+        <ToolSettings
+          tool={settingsTool}
+          onClose={() => setSettingsFor(null)}
+          onSave={(paths) => {
+            for (const [sourceId, path] of Object.entries(paths)) setLookupPath(settingsTool.id, sourceId, path);
+            setSettingsFor(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
 
-function MacroSettings({ tool, onPath }: { tool: DeskTool; onPath: (toolId: string, sourceId: string, path: string) => void }) {
-  const needs = MACRO_NEEDS[tool.kind as "ax" | "infotrack" | "kindertons"] ?? [];
-  if (!needs.length) {
-    return (
-      <div className="rounded-md border border-line px-4 py-3">
-        <p className="font-semibold text-navy">Settings</p>
-        <p className="mt-1 text-sm text-muted">Looking for the Infotrack download you drop here. This tool does not use another list.</p>
-      </div>
-    );
-  }
-  return (
-    <div className="grid gap-3">
-      <p className="font-semibold text-navy">Settings</p>
-      {needs.map((need) => (
-        <SourcePath key={need.id} tool={tool} sourceId={need.id} title={need.title} detail={need.detail} onPath={onPath} />
-      ))}
-    </div>
-  );
-}
-
-function SourcePath({
+function ToolSettings({
   tool,
-  sourceId,
-  title,
-  detail,
-  onPath,
+  onClose,
+  onSave,
 }: {
   tool: DeskTool;
-  sourceId: string;
-  title: string;
-  detail: string;
-  onPath: (toolId: string, sourceId: string, path: string) => void;
+  onClose: () => void;
+  onSave: (paths: Record<string, string>) => void;
 }) {
-  const saved = tool.lookups?.find((item) => item.id === sourceId)?.path ?? "";
-  const [path, setPath] = useState(saved);
-  const [focused, setFocused] = useState(false);
+  const needs = tool.kind === "ax" || tool.kind === "infotrack" || tool.kind === "kindertons" ? MACRO_NEEDS[tool.kind] : [];
+  const [paths, setPaths] = useState<Record<string, string>>(() =>
+    Object.fromEntries(needs.map((need) => [need.id, tool.lookups?.find((item) => item.id === need.id)?.path ?? ""])),
+  );
   const [note, setNote] = useState("");
 
-  useEffect(() => {
-    if (!focused) setPath(saved);
-  }, [saved, focused]);
-
-  async function choose() {
+  async function choose(sourceId: string) {
     const picked = await pickFilePath();
     if (picked === "cancel") return;
     if (picked === "unavailable") {
       setNote("Select location works in the Windows app. You can still paste a path.");
       return;
     }
-    setPath(picked.path);
-    setFocused(false);
     setNote("");
-    onPath(tool.id, sourceId, picked.path);
+    setPaths((current) => ({ ...current, [sourceId]: picked.path }));
   }
 
   return (
-    <div className="rounded-md border border-line px-4 py-3">
-      <p className="font-semibold text-navy">Looking for: {title}</p>
-      <p className="mt-1 text-sm text-muted">{detail} The path is saved on the shared drive, so every desk uses the same file.</p>
-      <label className="mt-3 block">
-        <span className="label">Path</span>
-        <input
-          className="input"
-          value={path}
-          placeholder="No file selected"
-          onFocus={() => setFocused(true)}
-          onChange={(event) => setPath(event.target.value)}
-          onBlur={() => {
-            setFocused(false);
-            onPath(tool.id, sourceId, path);
-          }}
-        />
-      </label>
-      <div className="mt-3 flex flex-wrap items-center gap-3">
-        <button type="button" className="btn btn-navy" onClick={() => void choose()}>
-          Select location
-        </button>
-        <span className="text-sm text-muted">{path.trim() ? "Saved for every desk." : "No file selected."}</span>
-      </div>
-      {note ? <p className="mt-1 text-sm text-muted">{note}</p> : null}
+    <div className="fixed inset-0 z-50 grid place-items-center bg-navy/45 p-4" role="dialog" aria-label={`${tool.name} settings`}>
+      <form
+        className="card modal grid max-h-[85dvh] w-full gap-4 overflow-auto p-6"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSave(paths);
+        }}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-semibold text-navy">{tool.name} settings</h2>
+            <p className="mt-1 text-sm text-muted">Choose the files this tool should use, then save. Every desk uses the same paths.</p>
+          </div>
+          <button type="button" className="btn btn-ghost min-w-11 px-3" onClick={onClose}>Close</button>
+        </div>
+        {needs.length ? needs.map((need) => (
+          <div key={need.id} className="rounded-md border border-line px-4 py-3">
+            <p className="font-semibold text-navy">{need.title}</p>
+            <p className="mt-1 text-sm text-muted">{need.detail}</p>
+            <label className="mt-3 block">
+              <span className="label">Path</span>
+              <input
+                className="input"
+                value={paths[need.id] ?? ""}
+                placeholder="No file selected"
+                onChange={(event) => setPaths((current) => ({ ...current, [need.id]: event.target.value }))}
+              />
+            </label>
+            <button type="button" className="btn btn-navy mt-3" onClick={() => void choose(need.id)}>Select location</button>
+          </div>
+        )) : (
+          <p className="text-sm text-muted">This tool has no file paths to set.</p>
+        )}
+        {note ? <p className="text-sm text-muted">{note}</p> : null}
+        <div className="flex flex-wrap gap-2">
+          <button type="submit" className="btn btn-gold">Save</button>
+          <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
+        </div>
+      </form>
     </div>
   );
 }
 
-function Runner({ tool, onPin, onRemove }: { tool: DeskTool; onPin: () => void; onRemove: () => void }) {
-  const setLookupPath = useDesk((s) => s.setLookupPath);
+function toolLook(kind: string): { wash: string; ink: string; chip: string; eyebrow: string } {
+  if (kind === "ax") return { wash: "from-[#0c1c4d] via-[#16356f] to-[#1e4f8a]", ink: "text-paper", chip: "bg-[#1e4f8a]", eyebrow: "Remittance" };
+  if (kind === "infotrack") return { wash: "from-[#0c4f4a] via-[#0f6e66] to-[#1a9488]", ink: "text-paper", chip: "bg-[#0f6e66]", eyebrow: "Ledgers" };
+  if (kind === "kindertons") return { wash: "from-[#fff1c2] via-[#f0c14a] to-[#e2ae32]", ink: "text-navy", chip: "bg-[#e2ae32]", eyebrow: "Court fees" };
+  if (kind === "limitation") return { wash: "from-[#fdeceb] via-[#f8d5d1] to-[#f3c2bb]", ink: "text-navy", chip: "bg-[#e7a197]", eyebrow: "Limitation" };
+  return { wash: "from-[#eef6ff] via-[#f6f1ff] to-[#fff6dc]", ink: "text-navy", chip: "bg-[#d9ebff]", eyebrow: "Desk tool" };
+}
+
+function Runner({ tool, onPin, onRemove, onSettings }: { tool: DeskTool; onPin: () => void; onRemove: () => void; onSettings: () => void }) {
+  const user = useDesk((s) => s.user);
   const [files, setFiles] = useState<File[]>([]);
   const [accident, setAccident] = useState("");
   const [dob, setDob] = useState("");
@@ -131,6 +144,7 @@ function Runner({ tool, onPin, onRemove }: { tool: DeskTool; onPin: () => void; 
   const [busy, setBusy] = useState(false);
   const [hot, setHot] = useState(false);
   const [dropKey, setDropKey] = useState(0);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const macro = tool.kind === "ax" || tool.kind === "infotrack" || tool.kind === "kindertons";
   const needs = tool.kind === "ax" || tool.kind === "infotrack" || tool.kind === "kindertons" ? MACRO_NEEDS[tool.kind] : [];
   const several = tool.kind === "bundle" || tool.kind === "kindertons" || tool.kind === "ax";
@@ -166,19 +180,39 @@ function Runner({ tool, onPin, onRemove }: { tool: DeskTool; onPin: () => void; 
     setDropKey((key) => key + 1);
   }
 
+  const look = toolLook(tool.kind);
+  const manager = user?.role === "manager";
+
   return (
     <section className="card overflow-hidden">
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-4">
-        <div>
-          <h2 className="text-2xl font-semibold text-navy">{tool.name}</h2>
-          <p className="mt-1 max-w-2xl text-muted">{tool.description}</p>
+      <div className={cx("relative overflow-hidden bg-linear-to-br px-6 py-6", look.wash, look.ink)}>
+        <div className="pointer-events-none absolute -top-8 -right-6 size-32 rounded-full bg-white/15" aria-hidden="true" />
+        <div className="pointer-events-none absolute right-16 -bottom-10 size-24 rounded-full bg-white/10" aria-hidden="true" />
+        <p className="text-[11px] font-semibold tracking-[0.16em] uppercase opacity-80">{look.eyebrow}</p>
+        <h2 className="mt-1 text-3xl font-semibold">{tool.name}</h2>
+        <p className="mt-2 max-w-2xl text-sm opacity-90">{tool.description}</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button type="button" className="btn bg-card text-navy shadow-sm" onClick={onSettings}>
+            <Settings className="size-4" aria-hidden="true" />
+            Settings
+          </button>
+          <button type="button" className="btn bg-card text-navy shadow-sm" onClick={onPin}>
+            <Pin className="size-4" aria-hidden="true" />
+            {tool.pinned ? "Unpin" : "Pin to menu"}
+          </button>
+          {manager ? (
+            confirmDelete ? (
+              <>
+                <button type="button" className="btn bg-card text-danger shadow-sm" onClick={onRemove}>Delete this tool</button>
+                <button type="button" className="btn bg-card text-navy shadow-sm" onClick={() => setConfirmDelete(false)}>Cancel</button>
+              </>
+            ) : (
+              <button type="button" className="btn bg-card text-danger shadow-sm" onClick={() => setConfirmDelete(true)}>Delete</button>
+            )
+          ) : null}
         </div>
-        <button type="button" className="btn btn-ghost" onClick={onPin}>
-          <Pin className="size-4" aria-hidden="true" />
-          {tool.pinned ? "Unpin" : "Pin to menu"}
-        </button>
       </div>
-      <div className="grid gap-4 px-5 py-4">
+      <div className="grid gap-4 px-5 py-5">
         {tool.kind === "limitation" ? (
           <div className="grid gap-3 sm:grid-cols-3">
             <label>
@@ -195,7 +229,6 @@ function Runner({ tool, onPin, onRemove }: { tool: DeskTool; onPin: () => void; 
             </label>
           </div>
         ) : null}
-        {macro ? <MacroSettings tool={tool} onPath={setLookupPath} /> : null}
         <div className="flex flex-wrap gap-2">
           <button type="button" className="btn btn-gold" disabled={busy || (macro && !files.length)} onClick={() => void run(false)}>
             {busy ? "Working…" : files.length || accident ? "Run and build workbook" : macro ? "Drop a file first" : "Run the sample"}
@@ -203,13 +236,13 @@ function Runner({ tool, onPin, onRemove }: { tool: DeskTool; onPin: () => void; 
           {canSample && (files.length || accident) ? (
             <button type="button" className="btn btn-ghost" onClick={() => void run(true)}>Use the sample instead</button>
           ) : null}
-          {tool.kind === "custom" ? (
-            <button type="button" className="btn btn-quiet text-danger" onClick={onRemove}>Remove tool</button>
-          ) : null}
         </div>
         <label
           data-tool-drop
-          className={cx("dropzone block cursor-pointer px-4 py-4 text-center", hot && "is-hot")}
+          className={cx(
+            "relative block cursor-pointer overflow-hidden rounded-2xl border border-dashed border-navy/20 bg-linear-to-b from-paper to-card px-6 py-8 text-center",
+            hot && "border-gold bg-gold/15",
+          )}
           onDragOver={(event) => {
             event.preventDefault();
             setHot(true);
@@ -222,7 +255,9 @@ function Runner({ tool, onPin, onRemove }: { tool: DeskTool; onPin: () => void; 
             setFiles([...event.dataTransfer.files]);
           }}
         >
-          <Upload className="mx-auto size-5 text-navy" aria-hidden="true" />
+          <span className="mx-auto grid size-14 place-items-center rounded-full bg-navy text-gold shadow-sm">
+            <Upload className="size-6" aria-hidden="true" />
+          </span>
           <span className="mt-2 block font-medium">
             {files.length
               ? files.map((file) => file.name).join(", ")

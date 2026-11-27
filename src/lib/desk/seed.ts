@@ -42,9 +42,10 @@ export function buildSeed(): DeskData {
 const SAMPLE_KINDS = new Set(["limitation", "time", "bundle", "disbursement", "cleaner"]);
 
 export function withStandardTools(data: DeskData): DeskData {
-  const kept = data.tools.filter((tool) => !SAMPLE_KINDS.has(tool.kind));
+  const retired = new Set(data.retiredTools ?? []);
+  const kept = data.tools.filter((tool) => !SAMPLE_KINDS.has(tool.kind) && !retired.has(tool.id));
   const ids = new Set(kept.map((tool) => tool.id));
-  const extra = buildSeed().tools.filter((tool) => !ids.has(tool.id));
+  const extra = buildSeed().tools.filter((tool) => !ids.has(tool.id) && !retired.has(tool.id));
   let users = data.users.map((user) => {
     const role = user.role as string;
     return role === "manager" || role === "office" || role === "client" || role === "user" ? user : { ...user, role: "user" as const };

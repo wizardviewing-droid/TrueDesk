@@ -869,9 +869,20 @@ export const useDesk = create<State>((set, get) => {
       set({ toolId: tool.id, view: "tools" });
     },
     removeTool: (id) => {
+      const user = get().user;
+      if (!user || user.role !== "manager") {
+        get().showToast("Only a manager can delete a tool.");
+        return;
+      }
+      const name = get().data?.tools.find((tool) => tool.id === id)?.name ?? "tool";
       edit((data) => {
-        data.tools = data.tools.filter((tool) => tool.id !== id || tool.kind !== "custom");
+        if (!data.tools.some((tool) => tool.id === id)) return;
+        data.tools = data.tools.filter((tool) => tool.id !== id);
+        data.retiredTools = [...new Set([...(data.retiredTools ?? []), id])];
+        log(data, user.id, `${user.name} deleted the ${name} tool.`);
       });
+      if (get().toolId === id) set({ toolId: null });
+      get().showToast(`${name} deleted.`);
     },
     setLookupPath: (toolId, sourceId, path) => {
       markPathsDirty();
