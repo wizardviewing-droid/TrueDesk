@@ -23,7 +23,6 @@ import {
   restoreWrap,
   signOutVault,
   storeFile,
-  copyStoredFile,
   unlock,
   usernameError,
   wrapFor,
@@ -43,7 +42,7 @@ import type {
   View,
 } from "@/lib/desk/types";
 import type { DeskRelease } from "@/lib/desk/storage";
-import { groupRole, remindMinutes, roleLabel, taskRepeat } from "@/lib/desk/types";
+import { groupRole, isAssignGroup, remindMinutes, roleLabel, taskRepeat } from "@/lib/desk/types";
 import { buildWorkbook } from "@/lib/desk/workbook";
 import { withStandardTools } from "@/lib/desk/seed";
 import { downloadBytes, XLSX_MIME } from "@/lib/desk/tools-run";
@@ -237,35 +236,6 @@ function taskById(data: DeskData, id: string) {
   return data.tasks.find((task) => task.id === id);
 }
 
-function peopleInGroup(data: DeskData, assigneeId: string): User[] {
-  const role = groupRole(assigneeId);
-  if (!role) return [];
-  return data.users.filter((person) => person.role === role);
-}
-
-function cloneFor(data: DeskData, source: Task, person: User, actor: User, copies: { from: string; to: string }[]) {
-  const id = crypto.randomUUID();
-  const task: Task = {
-    ...source,
-    id,
-    assigneeId: person.id,
-    assignerId: actor.id,
-    updatedAt: new Date().toISOString(),
-    completedAt: "",
-  };
-  data.tasks.unshift(task);
-  for (const note of data.notes.filter((item) => item.taskId === source.id)) {
-    data.notes.unshift({ ...note, id: crypto.randomUUID(), taskId: id });
-  }
-  for (const file of data.attachments.filter((item) => item.taskId === source.id)) {
-    const next = crypto.randomUUID();
-    data.attachments.push({ ...file, id: next, taskId: id });
-    copies.push({ from: file.id, to: next });
-  }
-  handOver(data, task, actor);
-  return id;
-}
-
 function handOver(data: DeskData, task: Task, actor: User): "own" | "manager" | "ask" {
   if (!data.notices) data.notices = [];
   if (task.assigneeId === actor.id) {
@@ -415,46 +385,45 @@ export const useDesk = create<State>((set, get) => {
       const user = get().user;
       if (!user) return null;
       const now = new Date().toISOString();
-      const group = partial.assigneeId ? groupRole(partial.assigneeId) : null;
-      if (group) {
-        const people = get().data?.users.filter((person) => person.role === group) ?? [];
-        if (!people.length) {
+      const shared = partial.assigneeId && isAssignGroup(partial.assigneeId) ? partial.assigneeId : "";
+      if (shared) {
+        const group = groupRole(shared);
+        const people = group ? get().data?.users.filter((person) => person.role === group) ?? [] : get().data?.users ?? [];
+        if (group && !people.length) {
           get().showToast("Nobody is on that team yet.");
           return null;
         }
-        const ids: string[] = [];
+        const id = crypto.randomUUID();
+        const task: Task = {
+          id,
+          title: partial.title?.trim() || "New task",
+          matter: partial.matter ?? "",
+          client: partial.client ?? "",
+          practice: partial.practice ?? "",
+          priority: partial.priority || "normal",
+          status: "accepted",
+          date: partial.date ?? todayISO(),
+          time: partial.time ?? "",
+          ownerId: user.id,
+          assigneeId: shared,
+          assignerId: user.id,
+          managerAssigned: user.role === "manager",
+          returnNote: "",
+          createdAt: now,
+          updatedAt: now,
+          completedAt: "",
+          repeat: partial.repeat && partial.repeat !== "once" ? partial.repeat : "once",
+          remind: remindMinutes(partial.remind),
+        };
         edit((data) => {
-          for (const person of people) {
-            const id = crypto.randomUUID();
-            const task: Task = {
-              id,
-              title: partial.title?.trim() || "New task",
-              matter: partial.matter ?? "",
-              client: partial.client ?? "",
-              practice: partial.practice ?? "",
-              priority: partial.priority || "normal",
-              status: "accepted",
-              date: partial.date ?? todayISO(),
-              time: partial.time ?? "",
-              ownerId: user.id,
-              assigneeId: person.id,
-              assignerId: user.id,
-              managerAssigned: false,
-              returnNote: "",
-              createdAt: now,
-              updatedAt: now,
-              completedAt: "",
-              repeat: partial.repeat && partial.repeat !== "once" ? partial.repeat : "once",
-              remind: remindMinutes(partial.remind),
-            };
-            data.tasks.unshift(task);
-            handOver(data, task, user);
-            ids.push(id);
-          }
-          log(data, user.id, `${user.name} added “${partial.title?.trim() || "New task"}” for the ${roleLabel(group).toLowerCase()}.`, ids[0]);
+          data.tasks.unshift(task);
+          const label = shared === "group:all" ? "everyone" : `the ${roleLabel(group!).toLowerCase()}`;
+          log(data, user.id, `${user.name} added “${task.title}” for ${label}.`, id);
         });
-        lastCreated = ids;
-        return ids[0] ?? null;
+        if (open) set({ editorId: id });
+        lastCreated = [id];
+        get().showToast(shared === "group:all" ? "Everyone will see this in Team tasks." : "On the team task list.");
+        return id;
       }
       const assigneeId = partial.assigneeId || user.id;
       const id = crypto.randomUUID();
@@ -509,30 +478,27 @@ export const useDesk = create<State>((set, get) => {
     assignTask: (id, assigneeId) => {
       const user = get().user;
       if (!user) return;
-      const grouped = groupRole(assigneeId);
+      const grouped = isAssignGroup(assigneeId);
       if (grouped) {
-        const copies: { from: string; to: string }[] = [];
-        let toast = "";
+        const role = groupRole(assigneeId);
+        const people = role ? get().data?.users.filter((person) => person.role === role) ?? [] : get().data?.users ?? [];
+        if (role && !people.length) {
+          get().showToast("Nobody is on that team yet.");
+          return;
+        }
         edit((data) => {
           const task = taskById(data, id);
-          const people = peopleInGroup(data, assigneeId);
-          if (!task || !people.length) {
-            toast = "Nobody is on that team yet.";
-            return;
-          }
-          const [first, ...rest] = people;
-          task.assigneeId = first.id;
+          if (!task) return;
+          task.assigneeId = assigneeId;
           task.assignerId = user.id;
+          task.status = "accepted";
+          task.managerAssigned = user.role === "manager";
           task.updatedAt = new Date().toISOString();
           task.completedAt = "";
-          handOver(data, task, user);
-          for (const person of rest) cloneFor(data, task, person, user, copies);
-          const label = roleLabel(grouped).toLowerCase();
-          log(data, user.id, `${user.name} put “${task.title}” on the ${label}.`, id);
-          toast = `Sent to the ${label}.`;
+          const label = assigneeId === "group:all" ? "everyone" : `the ${roleLabel(role!).toLowerCase()}`;
+          log(data, user.id, `${user.name} put “${task.title}” on Team tasks for ${label}.`, id);
         });
-        if (toast) get().showToast(toast);
-        for (const copy of copies) void copyStoredFile(copy.from, copy.to, user.username);
+        get().showToast(assigneeId === "group:all" ? "Everyone will see this in Team tasks." : "Moved to Team tasks.");
         return;
       }
       let toast = "";

@@ -5,7 +5,7 @@ import { cx } from "@/lib/cx";
 import { TaskActions } from "@/components/desk/task-actions";
 import { holidayOn, occursOn, parseISODate, todayISO, toISODate } from "@/lib/desk/dates";
 import { matchesQuery, useDesk } from "@/lib/desk/store";
-import { taskRepeat } from "@/lib/desk/types";
+import { assigneeLabel, seesTeamTask, taskRepeat } from "@/lib/desk/types";
 
 export function CalendarView() {
   const data = useDesk((s) => s.data);
@@ -35,6 +35,7 @@ export function CalendarView() {
   const tasks = data.tasks.filter((task) => {
     if (!task.date) return false;
     if (scope === "mine" && task.assigneeId !== user.id) return false;
+    if (scope === "team" && task.assigneeId.startsWith("group:") && !seesTeamTask(task.assigneeId, user.role)) return false;
     const notes = data.notes.filter((note) => note.taskId === task.id).map((note) => note.body).join(" ");
     return matchesQuery(task, notes, query);
   });
@@ -150,7 +151,7 @@ export function CalendarView() {
                 <button type="button" className="w-full text-left" onClick={() => openTask(task.id)}>
                   <span className="block font-medium">{task.title}</span>
                   <span className="text-sm text-muted">
-                    {task.time || "Any time"} · {data.users.find((person) => person.id === task.assigneeId)?.name}
+                    {task.time || "Any time"} · {assigneeLabel(task.assigneeId, data.users)}
                     {files.length ? ` · ${files.length} attached` : ""}
                   </span>
                 </button>

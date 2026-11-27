@@ -148,13 +148,14 @@ export function roleLabel(role: Role): string {
 }
 
 export const ASSIGN_GROUPS = [
+  { id: "group:all", label: "All users" },
   { id: "group:client", label: "Client team" },
   { id: "group:office", label: "Office team" },
   { id: "group:manager", label: "Manager" },
 ] as const;
 
 export function isAssignGroup(id: string): boolean {
-  return ASSIGN_GROUPS.some((group) => group.id === id);
+  return id === "group:all" || ASSIGN_GROUPS.some((group) => group.id === id);
 }
 
 export function groupRole(id: string): "manager" | "office" | "client" | null {
@@ -162,6 +163,20 @@ export function groupRole(id: string): "manager" | "office" | "client" | null {
   if (id === "group:office") return "office";
   if (id === "group:client") return "client";
   return null;
+}
+
+/** A manager, office or client team member sees their own team tasks. All users is visible to everyone. */
+export function seesTeamTask(assigneeId: string, role: Role): boolean {
+  if (assigneeId === "group:all") return true;
+  const group = groupRole(assigneeId);
+  return group !== null && group === role;
+}
+
+export function assigneeLabel(id: string, users: { id: string; name: string }[]): string {
+  if (id === "group:all") return "All users";
+  const group = groupRole(id);
+  if (group) return roleLabel(group);
+  return users.find((user) => user.id === id)?.name ?? "";
 }
 
 export function remindMinutes(value: unknown): Remind {

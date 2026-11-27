@@ -112,8 +112,10 @@ export function NewTaskDialog() {
             ))}
           </select>
           <span className="mt-2 block text-sm text-muted">
-            {groupRole(assigneeId)
-              ? `Everyone in ${roleLabel(groupRole(assigneeId)!)} gets this task.`
+            {assigneeId === "group:all"
+              ? "Everyone will see this in Team tasks."
+              : groupRole(assigneeId)
+              ? `The ${roleLabel(groupRole(assigneeId)!).toLowerCase()} will see this in Team tasks.`
               : assigneeId === user.id
                 ? "This will sit on your own desk."
                 : user.role === "manager"

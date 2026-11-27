@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { occursOn, parseISODate, todayISO } from "@/lib/desk/dates";
 import { useDesk } from "@/lib/desk/store";
-import { remindMinutes, taskRepeat, type Task } from "@/lib/desk/types";
+import { remindMinutes, seesTeamTask, taskRepeat, type Task } from "@/lib/desk/types";
 
 const seen = new Set<string>();
 let audio: AudioContext | null = null;
@@ -77,7 +77,7 @@ export function Reminders() {
       const now = new Date();
       const today = todayISO(now);
       const next = data.tasks.find((item) => {
-        if (item.assigneeId !== user.id) return false;
+        if (item.assigneeId !== user.id && !seesTeamTask(item.assigneeId, user.role)) return false;
         const key = `${item.id}|${today}|${item.time}|${remindMinutes(item.remind)}`;
         return due(item, now) && !seen.has(key);
       });

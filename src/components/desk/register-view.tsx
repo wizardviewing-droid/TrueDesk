@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { cx } from "@/lib/cx";
 import { parseISODate } from "@/lib/desk/dates";
 import { matchesQuery, useDesk } from "@/lib/desk/store";
-import { repeatLabel, statusLabel, taskRepeat, type Priority, type Repeat, type SheetName, type Task, type TaskStatus } from "@/lib/desk/types";
+import { assigneeLabel, repeatLabel, seesTeamTask, statusLabel, taskRepeat, type Priority, type Repeat, type SheetName, type Task, type TaskStatus } from "@/lib/desk/types";
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -39,6 +39,7 @@ export function RegisterView() {
   const tasks = data.tasks
     .filter((task) => {
       if (scope === "mine" && task.assigneeId !== user.id && task.assignerId !== user.id) return false;
+      if (scope === "team" && task.assigneeId.startsWith("group:") && !seesTeamTask(task.assigneeId, user.role)) return false;
       const notes = data.notes.filter((note) => note.taskId === task.id).map((note) => note.body).join(" ");
       return matchesQuery(task, notes, query);
     })
@@ -93,7 +94,7 @@ export function RegisterView() {
 
 function cellValue(task: Task, key: string, users: { id: string; name: string }[], files: number): string {
   if (key === "done") return task.status === "done" ? "Yes" : "";
-  if (key === "assignee") return users.find((user) => user.id === task.assigneeId)?.name ?? "";
+  if (key === "assignee") return assigneeLabel(task.assigneeId, users);
   if (key === "status") return statusLabel(task.status);
   if (key === "files") return files ? String(files) : "";
   if (key === "repeat") return taskRepeat(task);
@@ -325,7 +326,7 @@ function DiarySheet({ tasks, users, onOpen }: { tasks: Task[]; users: { id: stri
           <span className="cell">{task.time}</span>
           <span className="cell">{task.title}</span>
           <span className="cell">{task.matter}</span>
-          <span className="cell">{users.find((user) => user.id === task.assigneeId)?.name}</span>
+          <span className="cell">{assigneeLabel(task.assigneeId, users)}</span>
           <span className="cell">{statusLabel(task.status)}</span>
         </button>
       ))}

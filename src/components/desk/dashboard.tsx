@@ -5,7 +5,7 @@ import { TaskActions } from "@/components/desk/task-actions";
 import { cx } from "@/lib/cx";
 import { occursOn, parseISODate, todayISO, toISODate } from "@/lib/desk/dates";
 import { matchesQuery, priorityRank, useDesk } from "@/lib/desk/store";
-import { repeatLabel, taskRepeat, type Attachment, type Task } from "@/lib/desk/types";
+import { assigneeLabel, repeatLabel, seesTeamTask, taskRepeat, type Attachment, type Task } from "@/lib/desk/types";
 
 type Lens = "all" | "open" | "overdue" | "done";
 
@@ -50,7 +50,17 @@ export function Dashboard() {
   const byWhen = (a: Task, b: Task) =>
     (a.time || "99:99").localeCompare(b.time || "99:99") || priorityRank(a.priority) - priorityRank(b.priority) || a.title.localeCompare(b.title);
   const mine = listFor(data.tasks.filter((task) => visible(task) && task.assigneeId === user.id), lens, today, byWhen, false);
-  const team = listFor(data.tasks.filter((task) => visible(task) && task.assigneeId !== user.id), lens, today, byWhen, true);
+  const team = listFor(
+    data.tasks.filter((task) => {
+      if (!visible(task) || task.assigneeId === user.id) return false;
+      if (task.assigneeId.startsWith("group:")) return seesTeamTask(task.assigneeId, user.role);
+      return true;
+    }),
+    lens,
+    today,
+    byWhen,
+    true,
+  );
   const pending = data.tasks.filter((task) => visible(task) && task.assigneeId === user.id && task.status === "pending").sort(byWhen);
   const hour = new Date().getHours();
   const hello = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
@@ -122,7 +132,7 @@ export function Dashboard() {
       {board === "mine" ? (
         <TaskPanel title={yourTitle} tasks={mine.tasks} today={today} files={(id) => data.attachments.filter((file) => file.taskId === id)} empty={lens === "done" ? "Nothing completed today." : "Nothing on your desk."} onOpen={openTask} onFile={(id) => void downloadAttachment(id)} />
       ) : (
-        <TaskPanel title={teamTitle} tasks={team.tasks} today={today} who={(id) => data.users.find((person) => person.id === id)?.name} files={(id) => data.attachments.filter((file) => file.taskId === id)} empty={lens === "done" ? "No finished team work." : "Nothing on the team desk."} onOpen={openTask} onFile={(id) => void downloadAttachment(id)} />
+        <TaskPanel title={teamTitle} tasks={team.tasks} today={today} who={(id) => assigneeLabel(id, data.users)} files={(id) => data.attachments.filter((file) => file.taskId === id)} empty={lens === "done" ? "No finished team work." : "Nothing on the team desk."} onOpen={openTask} onFile={(id) => void downloadAttachment(id)} />
       )}
       {calculator ? <DeskCalculator onClose={() => setCalculator(false)} /> : null}
     </div>

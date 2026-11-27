@@ -30,12 +30,16 @@ export function TaskDrawer() {
   const assignee = data.users.find((item) => item.id === (choice || task.assigneeId));
   const moving = choice !== "" && choice !== task.assigneeId;
   const grouped = groupRole(choice);
-  const hint = grouped
-    ? `Everyone in ${roleLabel(grouped)} gets this task.`
+  const hint = choice === "group:all"
+    ? "Everyone will see this in Team tasks."
+    : grouped
+    ? `The ${roleLabel(grouped).toLowerCase()} will see this in Team tasks.`
     : moving
       ? `Press confirm before this moves to ${assignee?.name ?? "them"}.`
       : task.assigneeId === user.id
         ? "This sits on your own desk."
+        : task.assigneeId.startsWith("group:")
+          ? "This is on Team tasks."
         : user.role === "manager"
           ? `${assignee?.name ?? "They"} will be told it is on their desk. They cannot send it back.`
           : `${assignee?.name ?? "They"} will be asked to accept it. If they reject it, it comes back to you.`;
