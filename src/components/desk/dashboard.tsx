@@ -3,7 +3,7 @@ import { AlertTriangle, CalendarDays, ChevronRight, CircleCheck, ClipboardList, 
 import { useState } from "react";
 import { TaskActions } from "@/components/desk/task-actions";
 import { cx } from "@/lib/cx";
-import { parseISODate, todayISO } from "@/lib/desk/dates";
+import { parseISODate, todayISO, toISODate } from "@/lib/desk/dates";
 import { matchesQuery, priorityRank, useDesk } from "@/lib/desk/store";
 import { repeatLabel, taskRepeat, type Attachment, type Task } from "@/lib/desk/types";
 
@@ -13,11 +13,19 @@ function notesFor(taskId: string, notes: { taskId: string; body: string }[]) {
   return notes.filter((note) => note.taskId === taskId).map((note) => note.body).join(" ");
 }
 
+function doneOn(stamp: string): string {
+  const parsed = new Date(stamp);
+  if (Number.isNaN(parsed.getTime())) return stamp.slice(0, 10);
+  return toISODate(parsed);
+}
+
 function listFor(pool: Task[], lens: Lens, today: string, byWhen: (a: Task, b: Task) => number, pendingToo: boolean) {
   const live = pool.filter((task) => task.status === "accepted" || (pendingToo && task.status === "pending")).sort(byWhen);
   const overdue = live.filter((task) => task.date && task.date < today);
   const todayTasks = live.filter((task) => task.date === today);
-  const done = pool.filter((task) => task.status === "done").sort((a, b) => (b.completedAt || b.updatedAt).localeCompare(a.completedAt || a.updatedAt));
+  const done = pool
+    .filter((task) => task.status === "done" && doneOn(task.completedAt || task.updatedAt) === today)
+    .sort((a, b) => (b.completedAt || b.updatedAt).localeCompare(a.completedAt || a.updatedAt));
   const todayOpen = live.filter((task) => task.date === today);
   const tasks = lens === "done" ? done : lens === "overdue" ? overdue : lens === "open" ? todayOpen : [...overdue, ...todayTasks];
   return { live, overdue, done, tasks, todayOpen };
@@ -44,8 +52,8 @@ export function Dashboard() {
   const pending = data.tasks.filter((task) => visible(task) && task.assigneeId === user.id && task.status === "pending").sort(byWhen);
   const hour = new Date().getHours();
   const hello = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-  const yourTitle = lens === "done" ? "Your completed tasks" : lens === "overdue" ? "Your overdue tasks" : lens === "open" ? "Today's outstanding tasks" : "Your tasks – today";
-  const teamTitle = lens === "done" ? "Team completed" : lens === "overdue" ? "Team overdue" : lens === "open" ? "Today's team tasks" : "Team tasks – today";
+  const yourTitle = lens === "done" ? "Today's completed tasks" : lens === "overdue" ? "Your overdue tasks" : lens === "open" ? "Today's outstanding tasks" : "Your tasks – today";
+  const teamTitle = lens === "done" ? "Team completed today" : lens === "overdue" ? "Team overdue" : lens === "open" ? "Today's team tasks" : "Team tasks – today";
 
   function pick(next: Lens) {
     setLens((current) => (current === next ? "all" : next));
@@ -73,9 +81,9 @@ export function Dashboard() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Outstanding tasks" value={mine.todayOpen.length} tone="sky" icon={ClipboardList} active={board === "mine" && lens === "open"} onClick={() => { setBoard("mine"); pick("open"); }} />
+        <Stat label="Today's outstanding tasks" value={mine.todayOpen.length} tone="sky" icon={ClipboardList} active={board === "mine" && lens === "open"} onClick={() => { setBoard("mine"); pick("open"); }} />
         <Stat label="Overdue tasks" value={mine.overdue.length} tone="coral" icon={AlertTriangle} active={board === "mine" && lens === "overdue"} onClick={() => { setBoard("mine"); pick("overdue"); }} />
-        <Stat label="Completed tasks" value={mine.done.length} tone="sage" icon={CircleCheck} active={board === "mine" && lens === "done"} onClick={() => { setBoard("mine"); pick("done"); }} />
+        <Stat label="Today's completed" value={mine.done.length} tone="sage" icon={CircleCheck} active={board === "mine" && lens === "done"} onClick={() => { setBoard("mine"); pick("done"); }} />
         <Stat label="Team tasks" value={team.live.length} tone="gold" icon={Users} active={board === "team"} onClick={() => setBoard((current) => (current === "team" ? "mine" : "team"))} />
       </div>
 
@@ -104,7 +112,7 @@ export function Dashboard() {
       ) : null}
 
       {board === "mine" ? (
-        <TaskPanel title={yourTitle} tasks={mine.tasks} today={today} files={(id) => data.attachments.filter((file) => file.taskId === id)} empty={lens === "done" ? "Finished work shows up here." : "Nothing on your desk."} onOpen={openTask} onFile={(id) => void downloadAttachment(id)} />
+        <TaskPanel title={yourTitle} tasks={mine.tasks} today={today} files={(id) => data.attachments.filter((file) => file.taskId === id)} empty={lens === "done" ? "Nothing completed today." : "Nothing on your desk."} onOpen={openTask} onFile={(id) => void downloadAttachment(id)} />
       ) : (
         <TaskPanel title={teamTitle} tasks={team.tasks} today={today} who={(id) => data.users.find((person) => person.id === id)?.name} files={(id) => data.attachments.filter((file) => file.taskId === id)} empty={lens === "done" ? "No finished team work." : "Nothing on the team desk."} onOpen={openTask} onFile={(id) => void downloadAttachment(id)} />
       )}

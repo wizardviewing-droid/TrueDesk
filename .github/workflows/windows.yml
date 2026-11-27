@@ -52,8 +52,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          tag=v1.0.14
-          notes="Windows app for the accounts desk. Unzip TrueDesk.zip and open TrueDesk.exe. A manager can set Client team, Office team, or Manager. A task can go to one person or a whole team."
+          tag=v1.0.15
+          notes="Windows app for the accounts desk. Unzip TrueDesk.zip and open TrueDesk.exe. Outstanding and completed counts are for today."
           for i in 1 2 3 4 5 6; do
             if gh release view "$tag" >/dev/null 2>&1; then
               break
