@@ -12,7 +12,7 @@ import {
 } from "@/lib/desk/crypto";
 import { deskDisk } from "@/lib/desk/disk";
 import { buildSeed, OFFICE_CODE } from "@/lib/desk/seed";
-import type { DeskData, DiskStatus, Role, User } from "@/lib/desk/types";
+import { roleLabel, type DeskData, type DiskStatus, type Role, type User } from "@/lib/desk/types";
 import { APP_VERSION, isNewerVersion } from "@/lib/desk/version";
 import { buildWorkbook, parseWorkbook } from "@/lib/desk/workbook";
 
@@ -275,13 +275,13 @@ export async function registerAccount(input: {
   if (data.users.some((user) => user.username === username)) {
     return { error: "That username is already on the register." };
   }
-  const role: Role = data.users.some((person) => person.role === "manager") ? "user" : "manager";
+  const role: Role = data.users.some((person) => person.role === "manager") ? "client" : "manager";
   const user: User = {
     id: crypto.randomUUID(),
     username,
     name: input.name.trim(),
     role,
-    team: input.team.trim() || "Accounts",
+    team: roleLabel(role),
     job: input.job.trim() || "Accounts",
   };
   data.users.push(user);
@@ -315,13 +315,15 @@ export async function addColleague(input: {
   if (input.data.users.some((user) => user.username === username)) {
     return { error: "That username is already on the register." };
   }
-  const role: Role = input.actor.role === "manager" && input.role === "manager" ? "manager" : "user";
+  let role: Role = "client";
+  if (input.role === "office" || input.role === "client") role = input.role;
+  if (input.actor.role === "manager" && input.role === "manager") role = "manager";
   const user: User = {
     id: crypto.randomUUID(),
     username,
     name: input.name.trim(),
     role,
-    team: input.team.trim() || input.actor.team,
+    team: roleLabel(role),
     job: input.job.trim() || "Accounts",
   };
   const data: DeskData = {
@@ -446,6 +448,17 @@ export async function storeFile(file: File): Promise<{ id: string } | { error: s
   }
   memoryBlobs.set(id, sealed);
   return { id };
+}
+
+export async function copyStoredFile(fromId: string, toId: string): Promise<void> {
+  const stored = await blobGet(fromId);
+  if (!stored || !session) return;
+  memoryBlobs.set(toId, stored);
+  try {
+    await deskDisk().writeAttachment(toId, packBlob(stored));
+  } catch {
+    /* The task copy is saved. The file can be opened from the original task. */
+  }
 }
 
 export async function readFile(id: string, name: string, mime: string): Promise<boolean> {

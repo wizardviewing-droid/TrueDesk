@@ -1,4 +1,4 @@
-export type Role = "manager" | "user";
+export type Role = "manager" | "office" | "client" | "user";
 export type Priority = "high" | "normal" | "low";
 export type Repeat = "once" | "daily" | "weekly" | "monthly" | "annual";
 export type TaskStatus = "pending" | "accepted" | "done";
@@ -139,7 +139,26 @@ export function statusLabel(status: TaskStatus): string {
 
 export function roleLabel(role: Role): string {
   if (role === "manager") return "Manager";
-  return "Normal user";
+  if (role === "office") return "Office team";
+  if (role === "client") return "Client team";
+  return "Not set";
+}
+
+export const ASSIGN_GROUPS = [
+  { id: "group:client", label: "Client team" },
+  { id: "group:office", label: "Office team" },
+  { id: "group:manager", label: "Manager" },
+] as const;
+
+export function isAssignGroup(id: string): boolean {
+  return ASSIGN_GROUPS.some((group) => group.id === id);
+}
+
+export function groupRole(id: string): "manager" | "office" | "client" | null {
+  if (id === "group:manager") return "manager";
+  if (id === "group:office") return "office";
+  if (id === "group:client") return "client";
+  return null;
 }
 
 export function taskRepeat(task: { repeat?: Repeat }): Repeat {

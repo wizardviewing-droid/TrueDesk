@@ -154,7 +154,8 @@ export function parseWorkbook(bytes: ArrayBuffer | Uint8Array): DeskData {
   const wb = XLSX.read(bytes, { type: "array" });
   const users: User[] = sheetRows(wb, "Users")
     .map((row) => {
-      const role: Role = text(row.role) === "manager" ? "manager" : "user";
+      const raw = text(row.role);
+      const role: Role = raw === "manager" || raw === "office" || raw === "client" ? raw : "user";
       return {
         id: text(row.id),
         username: text(row.username).toLowerCase(),

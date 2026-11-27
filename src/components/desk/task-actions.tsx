@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useDesk } from "@/lib/desk/store";
+import { ASSIGN_GROUPS } from "@/lib/desk/types";
 
 export function TaskActions({ taskId }: { taskId: string }) {
   const data = useDesk((s) => s.data);
@@ -19,7 +20,8 @@ export function TaskActions({ taskId }: { taskId: string }) {
   if (!data || !user || !task) return null;
   const canDelete = user.role === "manager" || task.ownerId === user.id || task.assigneeId === user.id;
   const moving = choice !== task.assigneeId;
-  const nextName = data.users.find((person) => person.id === choice)?.name ?? "them";
+  const group = ASSIGN_GROUPS.find((item) => item.id === choice);
+  const nextName = group?.label ?? data.users.find((person) => person.id === choice)?.name ?? "them";
 
   function openDate() {
     const input = dateRef.current;
@@ -70,6 +72,9 @@ export function TaskActions({ taskId }: { taskId: string }) {
       {picking ? (
         <>
           <select className="input h-9 min-h-9 w-auto rounded-lg py-0 text-sm" value={choice} onChange={(event) => setChoice(event.target.value)}>
+            {ASSIGN_GROUPS.map((item) => (
+              <option key={item.id} value={item.id}>{item.label}</option>
+            ))}
             {data.users.map((person) => (
               <option key={person.id} value={person.id}>{person.name}</option>
             ))}

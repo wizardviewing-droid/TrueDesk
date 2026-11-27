@@ -13,9 +13,8 @@ export function PeopleView() {
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<Role>("user");
+  const [role, setRole] = useState<Role>("client");
   const [job, setJob] = useState("Accounts");
-  const [team, setTeam] = useState(user?.team ?? "Accounts");
   const [nextPassword, setNextPassword] = useState("");
   const [error, setError] = useState("");
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -34,7 +33,7 @@ export function PeopleView() {
               <li key={person.id} className="grid gap-3 border-b border-line px-5 py-4 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-center">
                 <div>
                   <p className="font-semibold">{person.name}{person.id === user.id ? " · You" : ""}</p>
-                  <p className="text-sm text-muted">{person.job} · {person.team} · {person.username}</p>
+                  <p className="text-sm text-muted">{person.job} · {roleLabel(person.role)} · {person.username}</p>
                   <p className="text-sm break-all text-muted">{PATHS.application}\{person.username}</p>
                   {waiting ? <p className="text-sm text-navy">{waiting} task{waiting === 1 ? "" : "s"} waiting for acceptance</p> : null}
                 </div>
@@ -43,9 +42,10 @@ export function PeopleView() {
                     <select
                       className="input"
                       value={person.role}
-                      aria-label={`Role for ${person.name}`}
+                      aria-label={`Department for ${person.name}`}
                       onChange={(event) => {
                         const next = event.target.value as Role;
+                        if (next === "user") return;
                         if (person.role === "manager" && next !== "manager" && managers <= 1) {
                           showToast("Keep at least one manager.");
                           return;
@@ -53,8 +53,10 @@ export function PeopleView() {
                         setUserRole(person.id, next);
                       }}
                     >
+                      {person.role === "user" ? <option value="user">Not set</option> : null}
                       <option value="manager">Manager</option>
-                      <option value="user">Normal user</option>
+                      <option value="office">Office team</option>
+                      <option value="client">Client team</option>
                     </select>
                     {person.id !== user.id ? (
                       confirmId === person.id ? (
@@ -91,7 +93,7 @@ export function PeopleView() {
           className="card grid gap-3 p-5"
           onSubmit={(event) => {
             event.preventDefault();
-            void addUser({ name, username, password, role: user.role === "manager" && role === "manager" ? "manager" : "user", job, team }).then((message) => {
+            void addUser({ name, username, password, role, job, team: roleLabel(role) }).then((message) => {
               setError(message ?? "");
               if (!message) {
                 setName("");
@@ -116,22 +118,17 @@ export function PeopleView() {
             <input className="input" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required />
           </label>
           <label>
-            <span className="label">Role</span>
+            <span className="label">Department</span>
             <select className="input" value={role} onChange={(event) => setRole(event.target.value as Role)}>
               {user.role === "manager" ? <option value="manager">Manager</option> : null}
-              <option value="user">Normal user</option>
+              <option value="office">Office team</option>
+              <option value="client">Client team</option>
             </select>
           </label>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label>
-              <span className="label">Job</span>
-              <input className="input" value={job} onChange={(event) => setJob(event.target.value)} />
-            </label>
-            <label>
-              <span className="label">Team</span>
-              <input className="input" value={team} onChange={(event) => setTeam(event.target.value)} />
-            </label>
-          </div>
+          <label>
+            <span className="label">Job</span>
+            <input className="input" value={job} onChange={(event) => setJob(event.target.value)} />
+          </label>
           {error ? <p className="text-sm text-danger">{error}</p> : null}
           <button className="btn btn-gold" type="submit">Add to the register</button>
         </form>

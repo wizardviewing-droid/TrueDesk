@@ -22,6 +22,7 @@ import {
   restoreWrap,
   signOutVault,
   storeFile,
+  copyStoredFile,
   unlock,
   usernameError,
   wrapFor,
@@ -41,7 +42,7 @@ import type {
   View,
 } from "@/lib/desk/types";
 import type { DeskRelease } from "@/lib/desk/storage";
-import { taskRepeat } from "@/lib/desk/types";
+import { groupRole, roleLabel, taskRepeat } from "@/lib/desk/types";
 import { buildWorkbook } from "@/lib/desk/workbook";
 import { withStandardTools } from "@/lib/desk/seed";
 import { downloadBytes, XLSX_MIME } from "@/lib/desk/tools-run";
@@ -223,8 +224,45 @@ function log(data: DeskData, actorId: string, message: string, taskId?: string) 
   });
 }
 
+let lastCreated: string[] = [];
+
+export function takeCreatedIds(): string[] {
+  const ids = lastCreated;
+  lastCreated = [];
+  return ids;
+}
+
 function taskById(data: DeskData, id: string) {
   return data.tasks.find((task) => task.id === id);
+}
+
+function peopleInGroup(data: DeskData, assigneeId: string): User[] {
+  const role = groupRole(assigneeId);
+  if (!role) return [];
+  return data.users.filter((person) => person.role === role);
+}
+
+function cloneFor(data: DeskData, source: Task, person: User, actor: User, copies: { from: string; to: string }[]) {
+  const id = crypto.randomUUID();
+  const task: Task = {
+    ...source,
+    id,
+    assigneeId: person.id,
+    assignerId: actor.id,
+    updatedAt: new Date().toISOString(),
+    completedAt: "",
+  };
+  data.tasks.unshift(task);
+  for (const note of data.notes.filter((item) => item.taskId === source.id)) {
+    data.notes.unshift({ ...note, id: crypto.randomUUID(), taskId: id });
+  }
+  for (const file of data.attachments.filter((item) => item.taskId === source.id)) {
+    const next = crypto.randomUUID();
+    data.attachments.push({ ...file, id: next, taskId: id });
+    copies.push({ from: file.id, to: next });
+  }
+  handOver(data, task, actor);
+  return id;
 }
 
 function handOver(data: DeskData, task: Task, actor: User): "own" | "manager" | "ask" {
@@ -374,6 +412,46 @@ export const useDesk = create<State>((set, get) => {
       const user = get().user;
       if (!user) return null;
       const now = new Date().toISOString();
+      const group = partial.assigneeId ? groupRole(partial.assigneeId) : null;
+      if (group) {
+        const people = get().data?.users.filter((person) => person.role === group) ?? [];
+        if (!people.length) {
+          get().showToast("Nobody is on that team yet.");
+          return null;
+        }
+        const ids: string[] = [];
+        edit((data) => {
+          for (const person of people) {
+            const id = crypto.randomUUID();
+            const task: Task = {
+              id,
+              title: partial.title?.trim() || "New task",
+              matter: partial.matter ?? "",
+              client: partial.client ?? "",
+              practice: partial.practice || "Personal injury",
+              priority: partial.priority || "normal",
+              status: "accepted",
+              date: partial.date ?? todayISO(),
+              time: partial.time ?? "",
+              ownerId: user.id,
+              assigneeId: person.id,
+              assignerId: user.id,
+              managerAssigned: false,
+              returnNote: "",
+              createdAt: now,
+              updatedAt: now,
+              completedAt: "",
+              repeat: partial.repeat && partial.repeat !== "once" ? partial.repeat : "once",
+            };
+            data.tasks.unshift(task);
+            handOver(data, task, user);
+            ids.push(id);
+          }
+          log(data, user.id, `${user.name} added “${partial.title?.trim() || "New task"}” for the ${roleLabel(group).toLowerCase()}.`, ids[0]);
+        });
+        lastCreated = ids;
+        return ids[0] ?? null;
+      }
       const assigneeId = partial.assigneeId || user.id;
       const id = crypto.randomUUID();
       const task: Task = {
@@ -413,6 +491,7 @@ export const useDesk = create<State>((set, get) => {
         );
       });
       if (open) set({ editorId: id });
+      lastCreated = [id];
       return id;
     },
     updateTask: (id, patch) => {
@@ -425,6 +504,32 @@ export const useDesk = create<State>((set, get) => {
     assignTask: (id, assigneeId) => {
       const user = get().user;
       if (!user) return;
+      const grouped = groupRole(assigneeId);
+      if (grouped) {
+        const copies: { from: string; to: string }[] = [];
+        let toast = "";
+        edit((data) => {
+          const task = taskById(data, id);
+          const people = peopleInGroup(data, assigneeId);
+          if (!task || !people.length) {
+            toast = "Nobody is on that team yet.";
+            return;
+          }
+          const [first, ...rest] = people;
+          task.assigneeId = first.id;
+          task.assignerId = user.id;
+          task.updatedAt = new Date().toISOString();
+          task.completedAt = "";
+          handOver(data, task, user);
+          for (const person of rest) cloneFor(data, task, person, user, copies);
+          const label = roleLabel(grouped).toLowerCase();
+          log(data, user.id, `${user.name} put “${task.title}” on the ${label}.`, id);
+          toast = `Sent to the ${label}.`;
+        });
+        if (toast) get().showToast(toast);
+        for (const copy of copies) void copyStoredFile(copy.from, copy.to);
+        return;
+      }
       let toast = "";
       edit((data) => {
         const task = taskById(data, id);
@@ -663,7 +768,8 @@ export const useDesk = create<State>((set, get) => {
         const person = data.users.find((item) => item.id === id);
         if (!person || person.role === role) return;
         person.role = role;
-        log(data, actor.id, `${actor.name} set ${person.name} as ${role === "manager" ? "a manager" : "a normal user"}.`);
+        person.team = roleLabel(role);
+        log(data, actor.id, `${actor.name} set ${person.name} as ${roleLabel(role).toLowerCase()}.`);
       });
     },
     addUser: async (input) => {

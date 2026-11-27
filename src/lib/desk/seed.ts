@@ -47,7 +47,7 @@ export function withStandardTools(data: DeskData): DeskData {
   const extra = buildSeed().tools.filter((tool) => !ids.has(tool.id));
   let users = data.users.map((user) => {
     const role = user.role as string;
-    return role === "manager" || role === "user" ? user : { ...user, role: "user" as const };
+    return role === "manager" || role === "office" || role === "client" || role === "user" ? user : { ...user, role: "user" as const };
   });
   if (users.length && !users.some((user) => user.role === "manager")) {
     users = users.map((user, index) => (index === 0 ? { ...user, role: "manager" as const } : user));

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { parseISODate } from "@/lib/desk/dates";
 import { TaskActions } from "@/components/desk/task-actions";
 import { useDesk } from "@/lib/desk/store";
-import { repeatLabel, taskRepeat, type Priority, type Repeat } from "@/lib/desk/types";
+import { ASSIGN_GROUPS, groupRole, repeatLabel, roleLabel, taskRepeat, type Priority, type Repeat } from "@/lib/desk/types";
 
 export function TaskDrawer() {
   const data = useDesk((s) => s.data);
@@ -29,13 +29,16 @@ export function TaskDrawer() {
   const files = data.attachments.filter((item) => item.taskId === task.id);
   const assignee = data.users.find((item) => item.id === (choice || task.assigneeId));
   const moving = choice !== "" && choice !== task.assigneeId;
-  const hint = moving
-    ? `Press confirm before this moves to ${assignee?.name ?? "them"}.`
-    : task.assigneeId === user.id
-      ? "This sits on your own desk."
-      : user.role === "manager"
-        ? `${assignee?.name ?? "They"} will be told it is on their desk. They cannot send it back.`
-        : `${assignee?.name ?? "They"} will be asked to accept it. If they reject it, it comes back to you.`;
+  const grouped = groupRole(choice);
+  const hint = grouped
+    ? `Everyone in ${roleLabel(grouped)} gets this task.`
+    : moving
+      ? `Press confirm before this moves to ${assignee?.name ?? "them"}.`
+      : task.assigneeId === user.id
+        ? "This sits on your own desk."
+        : user.role === "manager"
+          ? `${assignee?.name ?? "They"} will be told it is on their desk. They cannot send it back.`
+          : `${assignee?.name ?? "They"} will be asked to accept it. If they reject it, it comes back to you.`;
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end bg-navy/35" onClick={() => openTask(null)}>
@@ -88,6 +91,9 @@ export function TaskDrawer() {
           <label>
             <span className="label">Assign to</span>
             <select className="input" value={choice || task.assigneeId} onChange={(event) => setChoice(event.target.value)}>
+              {ASSIGN_GROUPS.map((item) => (
+                <option key={item.id} value={item.id}>{item.label}</option>
+              ))}
               {data.users.map((person) => (
                 <option key={person.id} value={person.id}>{person.name}</option>
               ))}

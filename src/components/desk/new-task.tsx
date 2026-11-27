@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { todayISO } from "@/lib/desk/dates";
-import { useDesk } from "@/lib/desk/store";
-import { repeatLabel, type Priority, type Repeat } from "@/lib/desk/types";
+import { useDesk, takeCreatedIds } from "@/lib/desk/store";
+import { ASSIGN_GROUPS, groupRole, repeatLabel, roleLabel, type Priority, type Repeat } from "@/lib/desk/types";
 
 export function NewTaskDialog() {
   const data = useDesk((s) => s.data);
@@ -36,7 +36,11 @@ export function NewTaskDialog() {
       },
       false,
     );
-    if (id && note.trim()) addNote(id, note.trim());
+    const created = takeCreatedIds();
+    const targets = created.length ? created : id ? [id] : [];
+    if (note.trim()) {
+      for (const item of targets) addNote(item, note.trim());
+    }
     closeCompose();
   }
 
@@ -88,16 +92,21 @@ export function NewTaskDialog() {
         <label>
           <span className="label">Assign to</span>
           <select className="input" value={assigneeId} onChange={(event) => setAssigneeId(event.target.value)}>
+            {ASSIGN_GROUPS.map((item) => (
+              <option key={item.id} value={item.id}>{item.label}</option>
+            ))}
             {data.users.map((person) => (
               <option key={person.id} value={person.id}>{person.name}</option>
             ))}
           </select>
           <span className="mt-2 block text-sm text-muted">
-            {assigneeId === user.id
-              ? "This will sit on your own desk."
-              : user.role === "manager"
-                ? `${assignee?.name ?? "They"} will be told it is on their desk.`
-                : `${assignee?.name ?? "They"} will be asked to accept it.`}
+            {groupRole(assigneeId)
+              ? `Everyone in ${roleLabel(groupRole(assigneeId)!)} gets this task.`
+              : assigneeId === user.id
+                ? "This will sit on your own desk."
+                : user.role === "manager"
+                  ? `${assignee?.name ?? "They"} will be told it is on their desk.`
+                  : `${assignee?.name ?? "They"} will be asked to accept it.`}
           </span>
         </label>
         <label>
