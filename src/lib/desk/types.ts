@@ -2,6 +2,7 @@ export type Role = "manager" | "office" | "client" | "user";
 export type Priority = "high" | "normal" | "low";
 export type Repeat = "once" | "daily" | "weekly" | "monthly" | "annual";
 export type TaskStatus = "pending" | "accepted" | "done";
+export type Remind = 0 | 5 | 10 | 15 | 30;
 export type ToolKind =
   | "limitation"
   | "time"
@@ -63,6 +64,7 @@ export type Task = {
   updatedAt: string;
   completedAt: string;
   repeat?: Repeat;
+  remind?: Remind;
 };
 
 export type Note = {
@@ -159,6 +161,12 @@ export function groupRole(id: string): "manager" | "office" | "client" | null {
   if (id === "group:office") return "office";
   if (id === "group:client") return "client";
   return null;
+}
+
+export function remindMinutes(value: unknown): Remind {
+  const minutes = Number(value);
+  if (minutes === 5 || minutes === 10 || minutes === 15 || minutes === 30) return minutes;
+  return 0;
 }
 
 export function taskRepeat(task: { repeat?: Repeat }): Repeat {

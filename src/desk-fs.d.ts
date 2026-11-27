@@ -18,6 +18,8 @@ declare global {
     trueDesk?: {
       readSpreadsheets: (target: string) => Promise<{ name: string; base64: string }[]>;
       pickFile: () => Promise<string | null>;
+      focusWindow?: () => Promise<void>;
+      clearAttention?: () => Promise<void>;
       openOutlook: (url: string) => Promise<void>;
       openFile: (name: string, base64: string) => Promise<void>;
       readVault: () => Promise<{ json: string | null; application: boolean; backup: boolean }>;

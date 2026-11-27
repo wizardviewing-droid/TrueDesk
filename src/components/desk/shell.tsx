@@ -26,6 +26,7 @@ import { Dashboard } from "@/components/desk/dashboard";
 import { PeopleView } from "@/components/desk/people-view";
 import { RegisterView } from "@/components/desk/register-view";
 import { NewTaskDialog } from "@/components/desk/new-task";
+import { Reminders } from "@/components/desk/reminder";
 import { TaskDrawer } from "@/components/desk/task-drawer";
 import { ToolsView } from "@/components/desk/tools-view";
 
@@ -231,6 +232,7 @@ export function Shell() {
         </div>
       ) : null}
       <TaskDrawer />
+      <Reminders />
       {composing ? <NewTaskDialog /> : null}
       <AcceptModal />
       {toast ? <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-md bg-navy px-4 py-3 text-sm text-paper shadow-lg">{toast}</div> : null}

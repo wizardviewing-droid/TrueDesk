@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { parseISODate } from "@/lib/desk/dates";
 import { TaskActions } from "@/components/desk/task-actions";
 import { useDesk } from "@/lib/desk/store";
-import { ASSIGN_GROUPS, groupRole, repeatLabel, roleLabel, taskRepeat, type Priority, type Repeat } from "@/lib/desk/types";
+import { ASSIGN_GROUPS, groupRole, remindMinutes, repeatLabel, roleLabel, taskRepeat, type Priority, type Remind, type Repeat } from "@/lib/desk/types";
 
 export function TaskDrawer() {
   const data = useDesk((s) => s.data);
@@ -86,6 +86,16 @@ export function TaskDrawer() {
             <label>
               <span className="label">Time (optional)</span>
               <input className="input" type="time" value={task.time} onChange={(event) => updateTask(task.id, { time: event.target.value })} />
+            </label>
+            <label>
+              <span className="label">Reminder</span>
+              <select className="input" value={String(remindMinutes(task.remind))} onChange={(event) => updateTask(task.id, { remind: Number(event.target.value) as Remind })}>
+                <option value="0">No reminder</option>
+                <option value="5">5 minutes before</option>
+                <option value="10">10 minutes before</option>
+                <option value="15">15 minutes before</option>
+                <option value="30">30 minutes before</option>
+              </select>
             </label>
           </div>
           <label>

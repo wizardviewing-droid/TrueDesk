@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { todayISO } from "@/lib/desk/dates";
 import { useDesk, takeCreatedIds } from "@/lib/desk/store";
-import { ASSIGN_GROUPS, groupRole, repeatLabel, roleLabel, type Priority, type Repeat } from "@/lib/desk/types";
+import { ASSIGN_GROUPS, groupRole, repeatLabel, roleLabel, type Priority, type Remind, type Repeat } from "@/lib/desk/types";
 
 export function NewTaskDialog() {
   const data = useDesk((s) => s.data);
@@ -13,6 +13,7 @@ export function NewTaskDialog() {
   const [title, setTitle] = useState("");
   const [date, setDate] = useState(composer.date || todayISO());
   const [time, setTime] = useState("");
+  const [remind, setRemind] = useState<Remind>(0);
   const [priority, setPriority] = useState<Priority>("normal");
   const [repeat, setRepeat] = useState<Repeat>("once");
   const [assigneeId, setAssigneeId] = useState(user?.id ?? "");
@@ -30,6 +31,7 @@ export function NewTaskDialog() {
         title: trimmed,
         date,
         time,
+        remind,
         priority,
         repeat,
         assigneeId: assigneeId || user!.id,
@@ -69,6 +71,16 @@ export function NewTaskDialog() {
           <label>
             <span className="label">Time</span>
             <input className="input" type="time" value={time} onChange={(event) => setTime(event.target.value)} />
+          </label>
+          <label>
+            <span className="label">Reminder</span>
+            <select className="input" value={String(remind)} onChange={(event) => setRemind(Number(event.target.value) as Remind)}>
+              <option value="0">No reminder</option>
+              <option value="5">5 minutes before</option>
+              <option value="10">10 minutes before</option>
+              <option value="15">15 minutes before</option>
+              <option value="30">30 minutes before</option>
+            </select>
           </label>
           <label>
             <span className="label">Priority</span>

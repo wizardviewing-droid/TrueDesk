@@ -42,7 +42,7 @@ import type {
   View,
 } from "@/lib/desk/types";
 import type { DeskRelease } from "@/lib/desk/storage";
-import { groupRole, roleLabel, taskRepeat } from "@/lib/desk/types";
+import { groupRole, remindMinutes, roleLabel, taskRepeat } from "@/lib/desk/types";
 import { buildWorkbook } from "@/lib/desk/workbook";
 import { withStandardTools } from "@/lib/desk/seed";
 import { downloadBytes, XLSX_MIME } from "@/lib/desk/tools-run";
@@ -442,6 +442,7 @@ export const useDesk = create<State>((set, get) => {
               updatedAt: now,
               completedAt: "",
               repeat: partial.repeat && partial.repeat !== "once" ? partial.repeat : "once",
+              remind: remindMinutes(partial.remind),
             };
             data.tasks.unshift(task);
             handOver(data, task, user);
@@ -473,6 +474,7 @@ export const useDesk = create<State>((set, get) => {
         updatedAt: now,
         completedAt: "",
         repeat: partial.repeat && partial.repeat !== "once" ? partial.repeat : "once",
+        remind: remindMinutes(partial.remind),
       };
       edit((data) => {
         data.tasks.unshift(task);

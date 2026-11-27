@@ -95,7 +95,7 @@ export function Dashboard() {
               <li key={task.id} className="card flex flex-wrap items-center justify-between gap-3 px-3 py-3">
                 <button type="button" className="min-w-0 text-left" onClick={() => openTask(task.id)}>
                   <span className="block font-semibold">{task.title}</span>
-                  <span className="text-sm text-muted">{repeatLabel(taskRepeat(task))}</span>
+                  <span className="text-sm text-muted">{task.time ? `${task.time} · ` : ""}{repeatLabel(taskRepeat(task))}</span>
                 </button>
                 <button type="button" className="btn btn-gold" onClick={() => acceptTask(task.id)}>Accept</button>
                 {data.attachments.filter((file) => file.taskId === task.id).map((file) => (
@@ -267,6 +267,9 @@ function TaskRow({ task, index, today, who, files, done, onOpen, onFile }: { tas
             </span>
           </span>
         </button>
+        {task.time ? (
+          <span className="shrink-0 rounded-full bg-navy px-3 py-1 text-sm font-semibold text-white tabular-nums">{task.time}</span>
+        ) : null}
         <span className={cx("shrink-0 rounded-full bg-[#d9e8f8] px-3 py-1 text-sm font-semibold text-navy", overdue && "bg-coral-soft text-coral", done && "bg-sage-soft text-sage", warm && !overdue && !done && "bg-[#f3e2a4]")}>
           {due}
         </span>

@@ -16,6 +16,7 @@ import type {
   User,
   Repeat,
 } from "@/lib/desk/types";
+import { remindMinutes } from "@/lib/desk/types";
 
 const TASK_HEADERS = [
   "id",
@@ -36,6 +37,7 @@ const TASK_HEADERS = [
   "updatedAt",
   "completedAt",
   "repeat",
+  "remind",
 ] as const;
 
 function text(value: unknown): string {
@@ -191,6 +193,7 @@ export function parseWorkbook(bytes: ArrayBuffer | Uint8Array): DeskData {
         updatedAt: text(row.updatedAt),
         completedAt: text(row.completedAt),
         repeat: REPEATS.has(repeat) ? repeat : "once",
+        remind: remindMinutes(row.remind),
       };
     })
     .filter((task) => task.id && task.title);

@@ -78,6 +78,19 @@ ipcMain.handle("pick-file", async () => {
   return result.filePaths[0];
 });
 
+ipcMain.handle("focus-window", () => {
+  const window = BrowserWindow.getAllWindows()[0];
+  if (!window) return;
+  if (window.isMinimized()) window.restore();
+  window.show();
+  window.focus();
+  window.flashFrame(true);
+});
+
+ipcMain.handle("clear-attention", () => {
+  for (const window of BrowserWindow.getAllWindows()) window.flashFrame(false);
+});
+
 ipcMain.handle("open-outlook", async (_event, url) => {
   if (typeof url !== "string" || !url.startsWith("mailto:")) throw new Error("Not an email link.");
   await shell.openExternal(url);
