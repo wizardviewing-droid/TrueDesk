@@ -247,7 +247,12 @@ function TaskRow({ task, index, today, who, files, done, onOpen, onFile }: { tas
   const waiting = task.status === "pending";
   const dueToday = !done && task.date === today;
   const warm = index % 2 === 1;
-  const subtitle = task.matter || task.practice || who || "Accounts";
+  const bits = [
+    task.matter,
+    who,
+    repeat !== "once" ? repeatLabel(repeat) : "",
+    files.length ? `${files.length} file${files.length === 1 ? "" : "s"}` : "",
+  ].filter(Boolean);
   const due = done ? "Done" : waiting ? "To accept" : overdue ? "Overdue" : dueToday ? "Due today" : task.date ? format(parseISODate(task.date), "d MMM") : "No date";
   return (
     <li className={cx("relative overflow-hidden rounded-xl border border-white shadow-sm", warm ? "bg-linear-to-r from-[#fff8e8] to-[#fff3d4]" : "bg-linear-to-r from-[#eef6ff] to-[#e4f1ff]", done && "opacity-75")}>
@@ -259,12 +264,7 @@ function TaskRow({ task, index, today, who, files, done, onOpen, onFile }: { tas
           </span>
           <span className="min-w-0">
             <span className={cx("block truncate font-semibold text-navy", done && "text-muted line-through")}>{task.title}</span>
-            <span className="block truncate text-sm text-muted">
-              {subtitle}
-              {who ? ` · ${who}` : ""}
-              {repeat !== "once" ? ` · ${repeatLabel(repeat)}` : ""}
-              {files.length ? ` · ${files.length} file${files.length === 1 ? "" : "s"}` : ""}
-            </span>
+            {bits.length ? <span className="block truncate text-sm text-muted">{bits.join(" · ")}</span> : null}
           </span>
         </button>
         {task.time ? (

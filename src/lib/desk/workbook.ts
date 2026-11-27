@@ -179,7 +179,7 @@ export function parseWorkbook(bytes: ArrayBuffer | Uint8Array): DeskData {
         title: text(row.title),
         matter: text(row.matter),
         client: text(row.client),
-        practice: text(row.practice) || "Personal injury",
+        practice: text(row.practice),
         priority: PRIORITIES.has(priority) ? priority : "normal",
         status: STATUSES.has(status) ? status : "accepted",
         date: text(row.date),
