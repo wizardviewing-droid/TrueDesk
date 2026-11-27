@@ -1,6 +1,6 @@
 {
   "name": "true-desk",
-  "version": "1.0.20",
+  "version": "1.0.21",
   "private": true,
   "main": "main.cjs",
   "description": "True Solicitors accounts desk",
@@ -21,12 +21,17 @@
     },
     "files": [
       "main.cjs",
-      "preload.cjs"
+      "preload.cjs",
+      "icon.ico"
     ],
     "extraResources": [
       {
         "from": "packed",
         "to": "app-server"
+      },
+      {
+        "from": "icon.ico",
+        "to": "icon.ico"
       }
     ],
     "win": {
@@ -34,6 +39,7 @@
         "nsis",
         "portable"
       ],
+      "icon": "icon.ico",
       "signAndEditExecutable": false
     },
     "nsis": {

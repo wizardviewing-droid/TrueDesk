@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { create } from "zustand";
-import { nextRepeatDate, nextWorkingDay, parseISODate, todayISO } from "@/lib/desk/dates";
+import { nextRepeatDate, nextWorkingDay, onWorkingDay, parseISODate, todayISO } from "@/lib/desk/dates";
 import {
   addColleague,
   bootVault,
@@ -588,6 +588,7 @@ export const useDesk = create<State>((set, get) => {
         if (task.status !== "done" && repeat !== "once") {
           const from = task.date || todayISO();
           const next = nextRepeatDate(from, repeat);
+          const shown = repeat === "monthly" || repeat === "annual" ? onWorkingDay(next) : next;
           data.tasks.unshift({
             ...task,
             id: crypto.randomUUID(),
@@ -602,8 +603,8 @@ export const useDesk = create<State>((set, get) => {
           task.completedAt = "";
           task.repeat = repeat;
           task.updatedAt = now;
-          log(data, user.id, `${user.name} completed “${task.title}”. The next one is ${next}.`, id);
-          toast = `Done. Next one is ${format(parseISODate(next), "EEE d MMM")}.`;
+          log(data, user.id, `${user.name} completed “${task.title}”. The next one is ${shown}.`, id);
+          toast = `Done. Next one is ${format(parseISODate(shown), "EEE d MMM")}.`;
           return;
         }
         const done = task.status !== "done";

@@ -22,11 +22,11 @@ export function addDays(iso: string, days: number): string {
 }
 
 export function nextWorkingDay(iso: string): string {
-  const d = parseISODate(iso);
+  let cursor = iso;
   do {
-    d.setDate(d.getDate() + 1);
-  } while (d.getDay() === 0 || d.getDay() === 6);
-  return toISODate(d);
+    cursor = addDays(cursor, 1);
+  } while (isTimeOff(cursor));
+  return cursor;
 }
 
 export function shiftISO(days: number, now = new Date()): string {
@@ -93,13 +93,17 @@ function nominalDate(anchor: string, year: number, month: number): string {
   return toISODate(new Date(year, month, Math.min(start.getDate(), last)));
 }
 
-/** Saturday and Sunday move back to the Friday. Weekdays stay put. */
+/** Weekends, bank holidays and public holidays move back to the previous working day. */
 export function onWorkingDay(iso: string): string {
-  const d = parseISODate(iso);
-  const day = d.getDay();
-  if (day === 6) d.setDate(d.getDate() - 1);
-  else if (day === 0) d.setDate(d.getDate() - 2);
-  return toISODate(d);
+  let cursor = iso;
+  for (let guard = 0; guard < 16 && isTimeOff(cursor); guard += 1) cursor = addDays(cursor, -1);
+  return cursor;
+}
+
+function isTimeOff(iso: string): boolean {
+  const day = parseISODate(iso).getDay();
+  if (day === 0 || day === 6) return true;
+  return Boolean(holidayOn(iso));
 }
 
 function rolledMatch(anchor: string, repeat: "monthly" | "annual", iso: string): boolean {

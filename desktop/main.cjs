@@ -48,12 +48,14 @@ function waitForDesk() {
 }
 
 function createWindow() {
+  const icon = iconFile();
   const window = new BrowserWindow({
     width: 1280,
     height: 840,
     title: "True Desk",
     backgroundColor: "#01033a",
     autoHideMenuBar: true,
+    icon: icon || undefined,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -384,11 +386,188 @@ ipcMain.handle("read-release", async () => {
   return buf ? buf.toString("utf8") : null;
 });
 
+const LOCAL_DIR = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "TrueDesk");
+const LOCAL_EXE = path.join(LOCAL_DIR, "TrueDesk.exe");
+const SHARED_EXE = path.join(APPLICATION, "TrueDesk.exe");
+const SHARED_VERSION = path.join(APPLICATION, "version.txt");
+const INSTALLED_STAMP = path.join(LOCAL_DIR, "installed.json");
+
+function iconFile() {
+  const candidates = [path.join(process.resourcesPath || "", "icon.ico"), path.join(__dirname, "icon.ico"), path.join(LOCAL_DIR, "TrueDesk.ico")];
+  return candidates.find((file) => file && fs.existsSync(file)) || "";
+}
+
+function versionParts(value) {
+  return String(value || "").trim().replace(/^v/i, "").split(".").map((part) => Number.parseInt(part, 10) || 0);
+}
+
+function versionIsNewer(next, current) {
+  const left = versionParts(next);
+  const right = versionParts(current);
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index += 1) {
+    const gap = (left[index] || 0) - (right[index] || 0);
+    if (gap > 0) return true;
+    if (gap < 0) return false;
+  }
+  return false;
+}
+
+function sameFile(left, right) {
+  if (!left || !right) return false;
+  return path.resolve(left).toLowerCase() === path.resolve(right).toLowerCase();
+}
+
+function runningExe() {
+  return process.env.PORTABLE_EXECUTABLE_FILE || process.execPath;
+}
+
+function packagedApp() {
+  return Boolean(process.env.PORTABLE_EXECUTABLE_FILE) || path.basename(process.execPath).toLowerCase() === "truedesk.exe";
+}
+
+function readStamp() {
+  try {
+    return JSON.parse(fs.readFileSync(INSTALLED_STAMP, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function writeStamp(stat, version) {
+  fs.mkdirSync(LOCAL_DIR, { recursive: true });
+  fs.writeFileSync(INSTALLED_STAMP, JSON.stringify({ size: stat.size, mtimeMs: stat.mtimeMs, version: version || app.getVersion() }));
+}
+
+function sharedPackage() {
+  if (!fs.existsSync(SHARED_EXE)) return null;
+  const stat = fs.statSync(SHARED_EXE);
+  if (!stat.isFile() || stat.size < 1_000_000) return null;
+  let version = "";
+  try {
+    version = fs.readFileSync(SHARED_VERSION, "utf8").trim().split(/\s+/)[0] || "";
+  } catch {
+    version = "";
+  }
+  return { stat, version };
+}
+
+function launchExe(exe) {
+  spawn(exe, [], { detached: true, stdio: "ignore", cwd: path.dirname(exe), windowsHide: true }).unref();
+}
+
+function swapAndLaunch(nextExe, targetExe) {
+  const bat = path.join(os.tmpdir(), `truedesk-update-${process.pid}.cmd`);
+  const lines = [
+    "@echo off",
+    "ping -n 3 127.0.0.1 >nul",
+    `copy /Y "${nextExe}" "${targetExe}"`,
+    `start "" "${targetExe}"`,
+    `del /F /Q "${nextExe}"`,
+    `del /F /Q "%~f0"`,
+  ];
+  fs.writeFileSync(bat, lines.join("\r\n"));
+  spawn("cmd.exe", ["/c", bat], { detached: true, stdio: "ignore", windowsHide: true }).unref();
+}
+
+function pinShortcut(target) {
+  if (process.platform !== "win32" || !target || !fs.existsSync(target)) return Promise.resolve();
+  const icon = iconFile() || target;
+  const child = spawn(
+    "powershell.exe",
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      "$desktop = [Environment]::GetFolderPath('Desktop'); if (-not $desktop) { return }; $shell = New-Object -ComObject WScript.Shell; $link = $shell.CreateShortcut((Join-Path $desktop 'True Desk.lnk')); $link.TargetPath = $env:TD_TARGET; $link.WorkingDirectory = Split-Path $env:TD_TARGET; $link.IconLocation = \"$env:TD_ICON,0\"; $link.Description = 'True Desk'; $link.Save()",
+    ],
+    { env: { ...process.env, TD_TARGET: target, TD_ICON: icon }, windowsHide: true },
+  );
+  return new Promise((resolve) => {
+    child.on("exit", () => resolve());
+    child.on("error", () => resolve());
+  });
+}
+
+async function installLocalCopy(source, stat, version) {
+  fs.mkdirSync(LOCAL_DIR, { recursive: true });
+  const icon = iconFile();
+  if (icon && !sameFile(icon, path.join(LOCAL_DIR, "TrueDesk.ico"))) {
+    await fs.promises.copyFile(icon, path.join(LOCAL_DIR, "TrueDesk.ico")).catch(() => {});
+  }
+  if (sameFile(source, LOCAL_EXE)) return;
+  await fs.promises.copyFile(source, LOCAL_EXE);
+  writeStamp(stat, version);
+}
+
+async function syncSharedApp() {
+  if (process.platform !== "win32" || !packagedApp()) return false;
+  try {
+    fs.mkdirSync(LOCAL_DIR, { recursive: true });
+    const running = runningExe();
+    const shared = sharedPackage();
+    const stamp = readStamp();
+    const mine = app.getVersion();
+    if (!shared) {
+      if (!fs.existsSync(LOCAL_EXE) && fs.existsSync(running)) await fs.promises.copyFile(running, LOCAL_EXE);
+      const target = fs.existsSync(LOCAL_EXE) ? LOCAL_EXE : running;
+      await pinShortcut(target);
+      if (fs.existsSync(LOCAL_EXE) && !sameFile(running, LOCAL_EXE)) {
+        launchExe(LOCAL_EXE);
+        app.exit(0);
+        return true;
+      }
+      return false;
+    }
+    const older = shared.version && versionIsNewer(mine, shared.version);
+    const newer = shared.version && versionIsNewer(shared.version, mine);
+    const changed = !stamp || stamp.size !== shared.stat.size || Math.abs((stamp.mtimeMs || 0) - shared.stat.mtimeMs) > 1;
+    const runningStat = fs.existsSync(running) ? fs.statSync(running) : null;
+    const fileIsNewer = !runningStat || shared.stat.mtimeMs > runningStat.mtimeMs + 2000;
+    const take = !older && (newer || (changed && fileIsNewer));
+    if (!take) {
+      if (!fs.existsSync(LOCAL_EXE)) {
+        await installLocalCopy(SHARED_EXE, shared.stat, shared.version || mine);
+        await pinShortcut(LOCAL_EXE);
+        if (!sameFile(running, LOCAL_EXE)) {
+          launchExe(LOCAL_EXE);
+          app.exit(0);
+          return true;
+        }
+      }
+      await pinShortcut(fs.existsSync(LOCAL_EXE) ? LOCAL_EXE : running);
+      return false;
+    }
+    if (sameFile(running, LOCAL_EXE)) {
+      const next = path.join(LOCAL_DIR, "TrueDesk.next.exe");
+      await fs.promises.copyFile(SHARED_EXE, next);
+      writeStamp(shared.stat, shared.version || mine);
+      await pinShortcut(LOCAL_EXE);
+      swapAndLaunch(next, LOCAL_EXE);
+      app.exit(0);
+      return true;
+    }
+    await installLocalCopy(SHARED_EXE, shared.stat, shared.version || mine);
+    await pinShortcut(LOCAL_EXE);
+    if (!sameFile(running, LOCAL_EXE)) {
+      launchExe(LOCAL_EXE);
+      app.exit(0);
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 app.whenReady().then(async () => {
   try {
+    const updating = await syncSharedApp();
+    if (updating) return;
     await startServer();
     await waitForDesk();
     createWindow();
+    void pinShortcut(fs.existsSync(LOCAL_EXE) ? LOCAL_EXE : runningExe());
   } catch (error) {
     dialog.showErrorBox("True Desk could not start", error instanceof Error ? error.message : String(error));
     app.quit();

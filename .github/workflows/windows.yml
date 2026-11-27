@@ -39,7 +39,9 @@ jobs:
           if (-not (Test-Path $entry)) { throw "The desk files were not packed." }
       - name: Zip the app
         shell: pwsh
-        run: Compress-Archive -Force -Path desktop/release/TrueDesk.exe -DestinationPath desktop/release/TrueDesk.zip
+        run: |
+          Set-Content -Path desktop/release/version.txt -Value "1.0.21" -NoNewline
+          Compress-Archive -Force -Path desktop/release/TrueDesk.exe, desktop/release/version.txt -DestinationPath desktop/release/TrueDesk.zip
       - name: Keep a copy of the zip
         uses: actions/upload-artifact@v4
         with:
@@ -52,8 +54,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          tag=v1.0.20
-          notes="Windows app for the accounts desk. Unzip TrueDesk.zip and open TrueDesk.exe. Monthly tasks that land on a weekend move to the Friday, and the calendar shows UK bank holidays."
+          tag=v1.0.21
+          notes="Windows app for the accounts desk. Unzip TrueDesk.zip into Y:\\accounts\\Tools\\Task application. A True Desk icon is added to the desktop, and a newer copy in that folder updates the app next time it is opened. Monthly tasks move off weekends and bank holidays."
           for i in 1 2 3 4 5 6; do
             if gh release view "$tag" >/dev/null 2>&1; then
               break
