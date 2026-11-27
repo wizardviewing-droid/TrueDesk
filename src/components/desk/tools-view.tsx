@@ -4,7 +4,7 @@ import { cx } from "@/lib/cx";
 import { MACRO_NEEDS } from "@/lib/desk/sources";
 import { useDesk } from "@/lib/desk/store";
 import { downloadBytes, bytesToBase64, openOutlook, resultWorkbook, runTool, XLSX_MIME, type MailDraft, type ToolResult } from "@/lib/desk/tools-run";
-import type { CustomMode, DeskTool } from "@/lib/desk/types";
+import type { DeskTool } from "@/lib/desk/types";
 import { filesFromPath, pickFilePath } from "@/lib/desk/desktop";
 import { sourceFolderFiles } from "@/lib/desk/storage";
 
@@ -13,7 +13,6 @@ export function ToolsView() {
   const toolId = useDesk((s) => s.toolId);
   const setTool = useDesk((s) => s.setTool);
   const togglePin = useDesk((s) => s.togglePin);
-  const addCustomTool = useDesk((s) => s.addCustomTool);
   const removeTool = useDesk((s) => s.removeTool);
   const tool = data?.tools.find((item) => item.id === toolId) ?? data?.tools[0];
   if (!data || !tool) return null;
@@ -32,77 +31,9 @@ export function ToolsView() {
             </li>
           ))}
         </ul>
-        <CustomForm onAdd={addCustomTool} />
       </aside>
       <Runner key={tool.id} tool={tool} onPin={() => togglePin(tool.id)} onRemove={() => removeTool(tool.id)} />
     </div>
-  );
-}
-
-function CustomForm({
-  onAdd,
-}: {
-  onAdd: (input: { name: string; description: string; mode: CustomMode; column: string; sumColumn?: string; days?: number }) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [mode, setMode] = useState<CustomMode>("sum-by");
-  const [column, setColumn] = useState("");
-  const [sumColumn, setSumColumn] = useState("");
-  const [days, setDays] = useState(3);
-  if (!open) {
-    return (
-      <button type="button" className="btn btn-quiet m-3" onClick={() => setOpen(true)}>
-        Add a tool
-      </button>
-    );
-  }
-  return (
-    <form
-      className="grid gap-3 p-3"
-      onSubmit={(event) => {
-        event.preventDefault();
-        onAdd({ name, description, mode, column, sumColumn, days });
-        setName("");
-        setColumn("");
-        setOpen(false);
-      }}
-    >
-      <label>
-        <span className="label">Name</span>
-        <input className="input" value={name} onChange={(event) => setName(event.target.value)} required />
-      </label>
-      <label>
-        <span className="label">What it does</span>
-        <input className="input" value={description} onChange={(event) => setDescription(event.target.value)} />
-      </label>
-      <label>
-        <span className="label">Action</span>
-        <select className="input" value={mode} onChange={(event) => setMode(event.target.value as CustomMode)}>
-          <option value="sum-by">Group and total</option>
-          <option value="dedupe">Remove duplicates</option>
-          <option value="add-days">Add days to a date</option>
-        </select>
-      </label>
-      <label>
-        <span className="label">Column</span>
-        <input className="input" value={column} placeholder="Matter" onChange={(event) => setColumn(event.target.value)} required />
-      </label>
-      {mode === "sum-by" ? (
-        <label>
-          <span className="label">Number column</span>
-          <input className="input" value={sumColumn} placeholder="Hours" onChange={(event) => setSumColumn(event.target.value)} />
-        </label>
-      ) : null}
-      {mode === "add-days" ? (
-        <label>
-          <span className="label">Days</span>
-          <input className="input" type="number" value={days} onChange={(event) => setDays(Number(event.target.value))} />
-        </label>
-      ) : null}
-      <button className="btn btn-navy" type="submit">Save to the library</button>
-    </form>
   );
 }
 

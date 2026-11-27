@@ -1,6 +1,6 @@
 import { format } from "date-fns";
-import { AlertTriangle, CalendarDays, ChevronRight, CircleCheck, ClipboardList, Coins, Paperclip, Table, Users, Wrench } from "lucide-react";
-import { useState } from "react";
+import { AlertTriangle, Calculator, CalendarDays, ChevronRight, CircleCheck, ClipboardList, Coins, Paperclip, Table, Users, Wrench } from "lucide-react";
+import { useEffect, useState } from "react";
 import { TaskActions } from "@/components/desk/task-actions";
 import { cx } from "@/lib/cx";
 import { occursOn, parseISODate, todayISO, toISODate } from "@/lib/desk/dates";
@@ -42,6 +42,7 @@ export function Dashboard() {
   const setView = useDesk((s) => s.setView);
   const [lens, setLens] = useState<Lens>("all");
   const [board, setBoard] = useState<"mine" | "team">("mine");
+  const [calculator, setCalculator] = useState(false);
   if (!data || !user) return null;
 
   const today = todayISO();
@@ -69,10 +70,16 @@ export function Dashboard() {
           </h1>
           <p className="mt-1 text-muted">{user.team}</p>
         </div>
-        <p className="flex items-center gap-2 rounded-full bg-card px-4 py-2 text-sm font-semibold text-navy shadow-sm">
-          <CalendarDays className="size-5" aria-hidden="true" />
-          {format(new Date(), "EEE d MMMM yyyy")}
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="flex items-center gap-2 rounded-full bg-card px-4 py-2 text-sm font-semibold text-navy shadow-sm">
+            <CalendarDays className="size-5" aria-hidden="true" />
+            {format(new Date(), "EEE d MMMM yyyy")}
+          </p>
+          <button type="button" className="btn btn-navy rounded-full shadow-sm" onClick={() => setCalculator(true)}>
+            <Calculator className="size-4" aria-hidden="true" />
+            Calculator
+          </button>
+        </div>
       </header>
 
       <div className="grid gap-3 md:grid-cols-3">
@@ -117,6 +124,7 @@ export function Dashboard() {
       ) : (
         <TaskPanel title={teamTitle} tasks={team.tasks} today={today} who={(id) => data.users.find((person) => person.id === id)?.name} files={(id) => data.attachments.filter((file) => file.taskId === id)} empty={lens === "done" ? "No finished team work." : "Nothing on the team desk."} onOpen={openTask} onFile={(id) => void downloadAttachment(id)} />
       )}
+      {calculator ? <DeskCalculator onClose={() => setCalculator(false)} /> : null}
     </div>
   );
 }
@@ -156,6 +164,179 @@ function TaskPanel({
         </ul>
       )}
     </section>
+  );
+}
+
+function formatCalc(value: number): string {
+  if (!Number.isFinite(value)) return "Error";
+  const rounded = Math.round(value * 1e10) / 1e10;
+  const text = String(rounded);
+  return text.length > 14 ? rounded.toExponential(6) : text;
+}
+
+function calculate(left: number, right: number, operator: string): number {
+  if (operator === "+") return left + right;
+  if (operator === "-") return left - right;
+  if (operator === "*") return left * right;
+  if (operator === "/") return right === 0 ? Number.NaN : left / right;
+  return right;
+}
+
+function DeskCalculator({ onClose }: { onClose: () => void }) {
+  const [display, setDisplay] = useState("0");
+  const [stored, setStored] = useState<number | null>(null);
+  const [operator, setOperator] = useState<string | null>(null);
+  const [fresh, setFresh] = useState(true);
+
+  function typeDigit(digit: string) {
+    setDisplay((current) => {
+      if (fresh) return digit === "." ? "0." : digit;
+      if (digit === "." && current.includes(".")) return current;
+      if (current === "0" && digit !== ".") return digit;
+      if (current.replace("-", "").replace(".", "").length >= 12) return current;
+      return current + digit;
+    });
+    setFresh(false);
+  }
+
+  function choose(next: string) {
+    const value = Number(display);
+    if (stored !== null && operator && !fresh) {
+      const result = calculate(stored, value, operator);
+      setStored(Number.isFinite(result) ? result : null);
+      setDisplay(formatCalc(result));
+    } else {
+      setStored(value);
+    }
+    setOperator(next);
+    setFresh(true);
+  }
+
+  function equals() {
+    if (stored === null || !operator) return;
+    const result = calculate(stored, Number(display), operator);
+    setDisplay(formatCalc(result));
+    setStored(null);
+    setOperator(null);
+    setFresh(true);
+  }
+
+  function clear() {
+    setDisplay("0");
+    setStored(null);
+    setOperator(null);
+    setFresh(true);
+  }
+
+  function backspace() {
+    if (fresh) return;
+    setDisplay((current) => (current.length <= 1 || (current.length === 2 && current.startsWith("-")) ? "0" : current.slice(0, -1)));
+  }
+
+  function percent() {
+    const value = Number(display);
+    if (!Number.isFinite(value)) return;
+    setDisplay(formatCalc(value / 100));
+    setFresh(true);
+  }
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const key = event.key;
+      if (key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (/^[0-9]$/.test(key)) {
+        event.preventDefault();
+        typeDigit(key);
+        return;
+      }
+      if (key === "." || key === ",") {
+        event.preventDefault();
+        typeDigit(".");
+        return;
+      }
+      if (key === "+" || key === "-" || key === "*" || key === "/") {
+        event.preventDefault();
+        choose(key);
+        return;
+      }
+      if (key === "Enter" || key === "=") {
+        event.preventDefault();
+        equals();
+        return;
+      }
+      if (key === "Backspace") {
+        event.preventDefault();
+        backspace();
+        return;
+      }
+      if (key === "Delete" || key.toLowerCase() === "c") {
+        event.preventDefault();
+        clear();
+        return;
+      }
+      if (key === "%") {
+        event.preventDefault();
+        percent();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  const keys: { label: string; run: () => void; tone?: "gold" | "navy" | "quiet" }[] = [
+    { label: "C", run: clear, tone: "quiet" },
+    { label: "⌫", run: backspace, tone: "quiet" },
+    { label: "%", run: percent, tone: "quiet" },
+    { label: "÷", run: () => choose("/"), tone: "gold" },
+    { label: "7", run: () => typeDigit("7") },
+    { label: "8", run: () => typeDigit("8") },
+    { label: "9", run: () => typeDigit("9") },
+    { label: "×", run: () => choose("*"), tone: "gold" },
+    { label: "4", run: () => typeDigit("4") },
+    { label: "5", run: () => typeDigit("5") },
+    { label: "6", run: () => typeDigit("6") },
+    { label: "−", run: () => choose("-"), tone: "gold" },
+    { label: "1", run: () => typeDigit("1") },
+    { label: "2", run: () => typeDigit("2") },
+    { label: "3", run: () => typeDigit("3") },
+    { label: "+", run: () => choose("+"), tone: "gold" },
+    { label: "0", run: () => typeDigit("0") },
+    { label: ".", run: () => typeDigit(".") },
+    { label: "=", run: equals, tone: "navy" },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-navy/45 p-4" role="dialog" aria-label="Calculator" onMouseDown={onClose}>
+      <div className="w-full max-w-xs rounded-2xl bg-card p-4 shadow-lg" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="font-semibold text-navy">Calculator</h2>
+          <button type="button" className="btn btn-quiet min-w-11 px-3" onClick={onClose}>Close</button>
+        </div>
+        <p className="mb-3 overflow-hidden rounded-xl bg-navy px-4 py-3 text-right text-3xl font-semibold text-paper tabular-nums" aria-live="polite">{display}</p>
+        <div className="grid grid-cols-4 gap-2">
+          {keys.map((key) => (
+            <button
+              key={key.label}
+              type="button"
+              className={cx(
+                "min-h-12 rounded-xl text-lg font-semibold",
+                key.label === "0" && "col-span-2",
+                key.tone === "gold" ? "bg-gold text-navy" : key.tone === "navy" ? "bg-navy text-paper" : key.tone === "quiet" ? "bg-paper text-navy" : "bg-sky-soft text-navy",
+              )}
+              onClick={key.run}
+            >
+              {key.label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-3 text-center text-xs text-muted">Number keys, + − * /, Enter, Backspace and Esc</p>
+      </div>
+    </div>
   );
 }
 
