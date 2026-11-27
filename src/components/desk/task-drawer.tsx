@@ -15,7 +15,7 @@ export function TaskDrawer() {
   const assignTask = useDesk((s) => s.assignTask);
   const moveTask = useDesk((s) => s.moveTask);
   const addNote = useDesk((s) => s.addNote);
-  const downloadAttachment = useDesk((s) => s.downloadAttachment);
+  const openViewer = useDesk((s) => s.openViewer);
   const attachFiles = useDesk((s) => s.attachFiles);
   const task = data?.tasks.find((item) => item.id === editorId);
   const [note, setNote] = useState("");
@@ -170,9 +170,9 @@ export function TaskDrawer() {
               <ul className="grid gap-2">
                 {files.map((file) => (
                   <li key={file.id}>
-                    <button type="button" className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md border border-line px-3 text-left" onClick={() => void downloadAttachment(file.id)}>
+                    <button type="button" className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md border border-line px-3 text-left" onClick={() => openViewer(file.id)}>
                       <span className="truncate font-medium">{file.name}</span>
-                      <span className="shrink-0 text-sm font-semibold text-navy">Open</span>
+                      <span className="shrink-0 text-sm font-semibold text-navy">View</span>
                     </button>
                   </li>
                 ))}

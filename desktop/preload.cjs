@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld("trueDesk", {
   clearAttention: () => ipcRenderer.invoke("clear-attention"),
   openOutlook: (payload) => ipcRenderer.invoke("open-outlook", payload),
   openFile: (username, name, base64) => ipcRenderer.invoke("open-file", username, name, base64),
+  openMail: (username, name, base64) => ipcRenderer.invoke("open-mail", username, name, base64),
   readVault: () => ipcRenderer.invoke("read-vault"),
   writeVault: (json) => ipcRenderer.invoke("write-vault", json),
   readProfile: (username) => ipcRenderer.invoke("read-profile", username),

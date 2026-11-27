@@ -15,7 +15,7 @@ export function CalendarView() {
   const setScope = useDesk((s) => s.setScope);
   const moveTask = useDesk((s) => s.moveTask);
   const openTask = useDesk((s) => s.openTask);
-  const downloadAttachment = useDesk((s) => s.downloadAttachment);
+  const openViewer = useDesk((s) => s.openViewer);
   const openCompose = useDesk((s) => s.openCompose);
   const [cursor, setCursor] = useState(() => new Date());
   const [selected, setSelected] = useState(todayISO());
@@ -156,9 +156,9 @@ export function CalendarView() {
                   </span>
                 </button>
                 {files.map((file) => (
-                  <button key={file.id} type="button" className="mt-2 flex min-h-9 w-full items-center gap-2 rounded-md bg-paper px-2 text-left text-sm font-medium" onClick={() => void downloadAttachment(file.id)}>
+                  <button key={file.id} type="button" className="mt-2 flex min-h-9 w-full items-center gap-2 rounded-md bg-paper px-2 text-left text-sm font-medium" onClick={() => openViewer(file.id)}>
                     {file.name}
-                    <span className="ml-auto text-xs text-muted">Open</span>
+                    <span className="ml-auto text-xs text-muted">View</span>
                   </button>
                 ))}
                 <TaskActions taskId={task.id} />

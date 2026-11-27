@@ -145,15 +145,45 @@ function outlookMessage({ to, cc, subject, body, filePath }) {
 }
 
 ipcMain.handle("open-file", async (_event, username, name, base64) => {
+  const dest = await writeOpened(username, name, base64);
+  const error = await shell.openPath(dest);
+  if (error) throw new Error(error);
+});
+
+ipcMain.handle("open-mail", async (_event, username, name, base64) => {
+  const dest = await writeOpened(username, name, base64);
+  const opened = await outlookOpenItem(dest);
+  if (opened) return;
+  const error = await shell.openPath(dest);
+  if (error) throw new Error(error);
+});
+
+async function writeOpened(username, name, base64) {
   if (typeof name !== "string" || typeof base64 !== "string" || !base64) throw new Error("That file could not be opened.");
   const folder = path.join(userFolder(APPLICATION, assertUsername(username)), "opened");
   await fs.promises.mkdir(folder, { recursive: true });
   const raw = path.basename(name).replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_").trim().slice(0, 180);
   const dest = path.join(folder, raw || "attachment");
   await fs.promises.writeFile(dest, Buffer.from(base64, "base64"));
-  const error = await shell.openPath(dest);
-  if (error) throw new Error(error);
-});
+  return dest;
+}
+
+function outlookOpenItem(filePath) {
+  return new Promise((resolve) => {
+    const script = [
+      "$ErrorActionPreference = 'Stop'",
+      "$outlook = New-Object -ComObject Outlook.Application",
+      "$item = $outlook.Session.OpenSharedItem($env:TD_FILE)",
+      "$item.Display()",
+    ].join("; ");
+    const child = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], {
+      env: { ...process.env, TD_FILE: filePath },
+      windowsHide: true,
+    });
+    child.on("error", () => resolve(false));
+    child.on("exit", (code) => resolve(code === 0));
+  });
+}
 
 ipcMain.handle("read-spreadsheets", async (_event, target) => {
   if (typeof target !== "string" || !target.trim() || target.length > 400) throw new Error("That path is not usable.");

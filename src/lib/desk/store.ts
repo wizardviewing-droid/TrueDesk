@@ -59,6 +59,7 @@ type State = {
   query: string;
   scope: Scope;
   editorId: string | null;
+  viewingId: string | null;
   toolId: string | null;
   phase: SavePhase;
   savedAt: string | null;
@@ -97,6 +98,8 @@ type State = {
   setScope: (scope: Scope) => void;
   setTool: (toolId: string | null) => void;
   openTask: (id: string | null) => void;
+  openViewer: (id: string) => void;
+  closeViewer: () => void;
   showToast: (toast: string) => void;
   createTask: (partial?: Partial<Task>, open?: boolean) => string | null;
   updateTask: (id: string, patch: Partial<Task>) => void;
@@ -111,7 +114,7 @@ type State = {
   addNote: (taskId: string, body: string) => void;
   attachFiles: (taskId: string, files: File[], quiet?: boolean) => Promise<void>;
   addFilesAsTasks: (files: File[], date?: string) => Promise<void>;
-  downloadAttachment: (id: string) => Promise<void>;
+  downloadAttachment: (id: string, mail?: boolean) => Promise<void>;
   setUserRole: (id: string, role: Role) => void;
   addUser: (input: {
     name: string;
@@ -274,6 +277,7 @@ export const useDesk = create<State>((set, get) => {
     query: "",
     scope: "mine",
     editorId: null,
+    viewingId: null,
     toolId: "tool-ax",
     phase: "saved",
     savedAt: null,
@@ -367,6 +371,8 @@ export const useDesk = create<State>((set, get) => {
     setScope: (scope) => set({ scope }),
     setTool: (toolId) => set({ toolId, view: "tools" }),
     openTask: (editorId) => set({ editorId }),
+    openViewer: (viewingId) => set({ viewingId }),
+    closeViewer: () => set({ viewingId: null }),
     showToast: (toast) => {
       set({ toast });
       window.clearTimeout(toastTimer);
@@ -723,12 +729,12 @@ export const useDesk = create<State>((set, get) => {
       if (other) get().showToast(user.role === "manager" ? `On ${who ?? "their"} desk.` : `Sent to ${who ?? "them"} to accept.`);
       else if (files.length > 1) get().showToast(`${files.length} tasks added from files.`);
     },
-    downloadAttachment: async (id) => {
+    downloadAttachment: async (id, mail = false) => {
       const file = get().data?.attachments.find((item) => item.id === id);
       if (!file) return;
       try {
         const owner = get().data?.users.find((person) => person.id === file.addedBy)?.username || get().user?.username;
-        const opened = owner ? await readFile(file.id, file.name, file.mime, owner) : false;
+        const opened = owner ? await readFile(file.id, file.name, file.mime, owner, mail) : false;
         if (!opened) get().showToast("That file is not on this desk any more.");
       } catch (error) {
         get().showToast(error instanceof Error ? error.message : "That file could not be opened.");

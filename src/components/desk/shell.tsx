@@ -19,6 +19,7 @@ import { todayISO } from "@/lib/desk/dates";
 import { useDesk, type SavePhase } from "@/lib/desk/store";
 import { type View } from "@/lib/desk/types";
 import { AcceptModal } from "@/components/desk/accept-modal";
+import { FileViewer } from "@/components/desk/file-viewer";
 import { CalendarView } from "@/components/desk/calendar-view";
 import { Dashboard } from "@/components/desk/dashboard";
 import { PeopleView } from "@/components/desk/people-view";
@@ -245,6 +246,7 @@ export function Shell() {
         </div>
       ) : null}
       <TaskDrawer />
+      <FileViewer />
       <Reminders />
       {composing ? <NewTaskDialog /> : null}
       <AcceptModal />

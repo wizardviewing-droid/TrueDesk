@@ -488,7 +488,15 @@ export async function copyStoredFile(fromId: string, toId: string, username: str
   }
 }
 
-export async function readFile(id: string, name: string, mime: string, username: string): Promise<boolean> {
+export async function readAttachmentBytes(id: string): Promise<Uint8Array | null> {
+  if (!session) return null;
+  const stored = await blobGet(id);
+  if (!stored) return null;
+  const plain = await decryptBlob(session.master, stored.iv, stored.data);
+  return new Uint8Array(plain);
+}
+
+export async function readFile(id: string, name: string, mime: string, username: string, mail = false): Promise<boolean> {
   if (!session) return false;
   const stored = await blobGet(id);
   if (!stored) return false;
@@ -498,8 +506,13 @@ export async function readFile(id: string, name: string, mime: string, username:
     /* Opening still works if the old copy is the one that was read. */
   }
   const plain = await decryptBlob(session.master, stored.iv, stored.data);
+  const packed = toB64(plain);
+  if (mail && window.trueDesk?.openMail) {
+    await window.trueDesk.openMail(username, name, packed);
+    return true;
+  }
   if (window.trueDesk?.openFile) {
-    await window.trueDesk.openFile(username, name, toB64(plain));
+    await window.trueDesk.openFile(username, name, packed);
     return true;
   }
   const blob = new Blob([plain], { type: mime || "application/octet-stream" });

@@ -10,7 +10,7 @@ export function AcceptModal() {
   const acceptTask = useDesk((s) => s.acceptTask);
   const declineTask = useDesk((s) => s.declineTask);
   const openTask = useDesk((s) => s.openTask);
-  const downloadAttachment = useDesk((s) => s.downloadAttachment);
+  const openViewer = useDesk((s) => s.openViewer);
   const [snoozed, setSnoozed] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -71,8 +71,8 @@ export function AcceptModal() {
               <ul className="mt-3 grid gap-1">
                 {files.map((file) => (
                   <li key={file.id}>
-                    <button type="button" className="text-sm font-semibold text-navy underline" onClick={() => void downloadAttachment(file.id)}>
-                      Open {file.name}
+                    <button type="button" className="text-sm font-semibold text-navy underline" onClick={() => openViewer(file.id)}>
+                      View {file.name}
                     </button>
                   </li>
                 ))}

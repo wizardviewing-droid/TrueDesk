@@ -30,6 +30,7 @@ declare global {
         fileBase64: string;
       }) => Promise<void>;
       openFile: (username: string, name: string, base64: string) => Promise<void>;
+      openMail?: (username: string, name: string, base64: string) => Promise<void>;
       readVault: () => Promise<{ json: string | null; application: boolean; backup: boolean }>;
       writeVault: (json: string) => Promise<{ application: boolean; backup: boolean }>;
       readProfile: (username: string) => Promise<string | null>;

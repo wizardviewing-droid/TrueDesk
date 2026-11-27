@@ -37,7 +37,7 @@ export function Dashboard() {
   const user = useDesk((s) => s.user);
   const query = useDesk((s) => s.query);
   const openTask = useDesk((s) => s.openTask);
-  const downloadAttachment = useDesk((s) => s.downloadAttachment);
+  const openViewer = useDesk((s) => s.openViewer);
   const acceptTask = useDesk((s) => s.acceptTask);
   const setView = useDesk((s) => s.setView);
   const [lens, setLens] = useState<Lens>("all");
@@ -117,10 +117,10 @@ export function Dashboard() {
                 </button>
                 <button type="button" className="btn btn-gold" onClick={() => acceptTask(task.id)}>Accept</button>
                 {data.attachments.filter((file) => file.taskId === task.id).map((file) => (
-                  <button key={file.id} type="button" className="flex min-h-9 w-full items-center gap-2 rounded-md bg-paper px-2 text-left text-sm font-medium" onClick={() => void downloadAttachment(file.id)}>
+                  <button key={file.id} type="button" className="flex min-h-9 w-full items-center gap-2 rounded-md bg-paper px-2 text-left text-sm font-medium" onClick={() => openViewer(file.id)}>
                     <Paperclip className="size-3.5" aria-hidden="true" />
                     <span className="truncate">{file.name}</span>
-                    <span className="ml-auto text-xs text-muted">Open</span>
+                    <span className="ml-auto text-xs text-muted">View</span>
                   </button>
                 ))}
               </li>
@@ -130,9 +130,9 @@ export function Dashboard() {
       ) : null}
 
       {board === "mine" ? (
-        <TaskPanel title={yourTitle} tasks={mine.tasks} today={today} files={(id) => data.attachments.filter((file) => file.taskId === id)} empty={lens === "done" ? "Nothing completed today." : "Nothing on your desk."} onOpen={openTask} onFile={(id) => void downloadAttachment(id)} />
+        <TaskPanel title={yourTitle} tasks={mine.tasks} today={today} files={(id) => data.attachments.filter((file) => file.taskId === id)} empty={lens === "done" ? "Nothing completed today." : "Nothing on your desk."} onOpen={openTask} onFile={openViewer} />
       ) : (
-        <TaskPanel title={teamTitle} tasks={team.tasks} today={today} who={(id) => assigneeLabel(id, data.users)} files={(id) => data.attachments.filter((file) => file.taskId === id)} empty={lens === "done" ? "No finished team work." : "Nothing on the team desk."} onOpen={openTask} onFile={(id) => void downloadAttachment(id)} />
+        <TaskPanel title={teamTitle} tasks={team.tasks} today={today} who={(id) => assigneeLabel(id, data.users)} files={(id) => data.attachments.filter((file) => file.taskId === id)} empty={lens === "done" ? "No finished team work." : "Nothing on the team desk."} onOpen={openTask} onFile={openViewer} />
       )}
       {calculator ? <DeskCalculator onClose={() => setCalculator(false)} /> : null}
     </div>
@@ -474,7 +474,7 @@ function TaskRow({ task, index, today, who, files, done, onOpen, onFile }: { tas
               <button type="button" className="flex h-8 w-full items-center gap-2 rounded-lg bg-card/70 px-3 text-left text-sm font-medium text-navy" onClick={() => onFile(file.id)}>
                 <Paperclip className="size-3.5 shrink-0" aria-hidden="true" />
                 <span className="truncate">{file.name}</span>
-                <span className="ml-auto text-xs text-muted">Open</span>
+                <span className="ml-auto text-xs text-muted">View</span>
               </button>
             </li>
           ))}
