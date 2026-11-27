@@ -5,7 +5,7 @@ contextBridge.exposeInMainWorld("trueDesk", {
   pickFile: () => ipcRenderer.invoke("pick-file"),
   focusWindow: () => ipcRenderer.invoke("focus-window"),
   clearAttention: () => ipcRenderer.invoke("clear-attention"),
-  openOutlook: (url) => ipcRenderer.invoke("open-outlook", url),
+  openOutlook: (payload) => ipcRenderer.invoke("open-outlook", payload),
   openFile: (username, name, base64) => ipcRenderer.invoke("open-file", username, name, base64),
   readVault: () => ipcRenderer.invoke("read-vault"),
   writeVault: (json) => ipcRenderer.invoke("write-vault", json),

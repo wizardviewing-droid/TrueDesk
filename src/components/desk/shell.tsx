@@ -2,7 +2,6 @@ import { format } from "date-fns";
 import {
   Bell,
   CalendarDays,
-  Download,
   LayoutGrid,
   LogOut,
   Menu,
@@ -12,14 +11,13 @@ import {
   Table,
   Users,
   Wrench,
-  X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { TrueMark } from "@/components/logo";
 import { cx } from "@/lib/cx";
 import { todayISO } from "@/lib/desk/dates";
 import { useDesk, type SavePhase } from "@/lib/desk/store";
-import { PATHS, type View } from "@/lib/desk/types";
+import { type View } from "@/lib/desk/types";
 import { AcceptModal } from "@/components/desk/accept-modal";
 import { CalendarView } from "@/components/desk/calendar-view";
 import { Dashboard } from "@/components/desk/dashboard";
@@ -51,11 +49,12 @@ export function Shell() {
   const data = useDesk((s) => s.data);
   const view = useDesk((s) => s.view);
   const setView = useDesk((s) => s.setView);
+  const toolId = useDesk((s) => s.toolId);
+  const setTool = useDesk((s) => s.setTool);
   const query = useDesk((s) => s.query);
   const setQuery = useDesk((s) => s.setQuery);
   const phase = useDesk((s) => s.phase);
   const savedAt = useDesk((s) => s.savedAt);
-  const inSync = useDesk((s) => s.inSync);
   const saveNow = useDesk((s) => s.saveNow);
   const signOut = useDesk((s) => s.signOut);
   const openCompose = useDesk((s) => s.openCompose);
@@ -64,13 +63,10 @@ export function Shell() {
   const attachFiles = useDesk((s) => s.attachFiles);
   const openTask = useDesk((s) => s.openTask);
   const dismissNotice = useDesk((s) => s.dismissNotice);
-  const downloadExcel = useDesk((s) => s.downloadExcel);
-  const downloadVault = useDesk((s) => s.downloadVault);
   const toast = useDesk((s) => s.toast);
   const release = useDesk((s) => s.release);
   const installRelease = useDesk((s) => s.installRelease);
   const [menu, setMenu] = useState(false);
-  const [copies, setCopies] = useState(false);
   const [hot, setHot] = useState(false);
   const depth = useRef(0);
 
@@ -92,6 +88,7 @@ export function Shell() {
   ).length;
   const pending = data.tasks.filter((task) => task.assigneeId === user.id && task.status === "pending").length;
   const unread = (data.notices ?? []).filter((notice) => notice.userId === user.id && !notice.read);
+  const pinned = data.tools.filter((tool) => tool.pinned);
 
   return (
     <div
@@ -130,20 +127,42 @@ export function Shell() {
           <TrueMark className="h-6 w-auto text-gold" />
           <p className="mt-3 text-[11px] font-semibold tracking-[0.18em] text-gold uppercase">Accounts task desk</p>
         </div>
-        <nav className="mt-7 grid gap-1 px-3">
+        <nav className="mt-7 grid min-h-0 flex-1 content-start gap-1 overflow-auto px-3">
           {NAV.map((item) => {
             const Icon = item.icon;
-            const active = view === item.id;
+            const selected = item.id === "tools" ? view === "tools" && !pinned.some((tool) => tool.id === toolId) : view === item.id;
             return (
               <button
                 key={item.id}
                 type="button"
-                className={cx("flex min-h-11 items-center gap-3 rounded-xl px-3 text-left text-sm font-semibold", active ? "bg-gold text-navy shadow-sm" : "text-paper/85 hover:bg-paper/10")}
-                onClick={() => { setView(item.id); setMenu(false); }}
+                className={cx("flex min-h-11 items-center gap-3 rounded-xl px-3 text-left text-sm font-semibold", selected ? "bg-gold text-navy shadow-sm" : "text-paper/85 hover:bg-paper/10")}
+                onClick={() => {
+                  if (item.id === "tools") setTool(null);
+                  setView(item.id);
+                  setMenu(false);
+                }}
               >
                 <Icon className="size-4" aria-hidden="true" />
                 <span className="flex-1">{item.label}</span>
-                {item.id === "today" && attention ? <span className={cx("tabular-nums", active ? "text-navy" : "text-gold")}>{attention}</span> : null}
+                {item.id === "today" && attention ? <span className={cx("tabular-nums", selected ? "text-navy" : "text-gold")}>{attention}</span> : null}
+              </button>
+            );
+          })}
+          {pinned.map((tool) => {
+            const selected = view === "tools" && toolId === tool.id;
+            return (
+              <button
+                key={tool.id}
+                type="button"
+                className={cx("flex min-h-11 items-center gap-3 rounded-xl px-3 text-left text-sm font-semibold", selected ? "bg-gold text-navy shadow-sm" : "text-paper/85 hover:bg-paper/10")}
+                onClick={() => {
+                  setTool(tool.id);
+                  setView("tools");
+                  setMenu(false);
+                }}
+              >
+                <Wrench className="size-4 shrink-0" aria-hidden="true" />
+                <span className="flex-1 truncate">{tool.name}</span>
               </button>
             );
           })}
@@ -154,18 +173,12 @@ export function Shell() {
             <path d="M-10 138 C80 70 160 160 270 96" fill="none" stroke="currentColor" strokeWidth="3" opacity="0.55" />
           </svg>
           <div className="relative">
-            <p className={cx("font-semibold", inSync ? "text-gold" : "text-paper")}>{inSync ? "Both copies match" : "Copies need a check"}</p>
-            <p className="mt-2 text-paper/75">Application copy on the shared drive</p>
-            <p className="text-paper/75">Backup copy on the shared drive</p>
-            <button type="button" className="btn btn-quiet mt-4 px-0 text-gold" onClick={() => setCopies(true)}>Workbook copies</button>
-            <div className="mt-5">
-              <p className="font-semibold">{user.name}</p>
-              <p className="text-paper/75">{user.job}</p>
-              <button type="button" className="btn btn-quiet mt-3 px-0 text-paper" onClick={() => void signOut()}>
-                <LogOut className="size-4" aria-hidden="true" />
-                Sign out
-              </button>
-            </div>
+            <p className="font-semibold">{user.name}</p>
+            <p className="text-paper/75">{user.job}</p>
+            <button type="button" className="btn btn-quiet mt-3 px-0 text-paper" onClick={() => void signOut()}>
+              <LogOut className="size-4" aria-hidden="true" />
+              Sign out
+            </button>
           </div>
         </div>
       </aside>
@@ -236,40 +249,6 @@ export function Shell() {
       {composing ? <NewTaskDialog /> : null}
       <AcceptModal />
       {toast ? <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-md bg-navy px-4 py-3 text-sm text-paper shadow-lg">{toast}</div> : null}
-      {copies ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-navy/45 p-4" role="dialog" aria-label="Workbook copies">
-          <div className="card modal grid gap-4 p-6">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-xl font-semibold text-navy">Workbook copies</h2>
-                <p className="mt-1 text-sm text-muted">Both copies are written only to the shared drive. Each person has a folder in their username. Nothing is stored on this computer.</p>
-              </div>
-              <button type="button" className="btn btn-ghost min-w-11 px-3" aria-label="Close" onClick={() => setCopies(false)}>
-                <X className="size-4" />
-              </button>
-            </div>
-            <CopyRow title="Application" path={PATHS.application} />
-            <CopyRow title="Backup" path={PATHS.backup} />
-            <div className="flex flex-wrap gap-2">
-              <button type="button" className="btn btn-navy" onClick={downloadExcel}>
-                <Download className="size-4" aria-hidden="true" />
-                Export Excel
-              </button>
-              <button type="button" className="btn btn-ghost" onClick={() => void downloadVault()}>Protected copy</button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function CopyRow({ title, path }: { title: string; path: string }) {
-  return (
-    <div className="rounded-md border border-line px-3 py-3">
-      <p className="font-semibold text-navy">{title}</p>
-      <p className="text-sm break-all text-muted">{path}</p>
-      <p className="mt-1 text-sm text-muted">Profiles are folders named with the username.</p>
     </div>
   );
 }

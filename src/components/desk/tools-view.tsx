@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { cx } from "@/lib/cx";
 import { MACRO_NEEDS } from "@/lib/desk/sources";
 import { useDesk } from "@/lib/desk/store";
-import { downloadBytes, openOutlook, resultWorkbook, runTool, XLSX_MIME, type ToolResult } from "@/lib/desk/tools-run";
+import { downloadBytes, bytesToBase64, openOutlook, resultWorkbook, runTool, XLSX_MIME, type MailDraft, type ToolResult } from "@/lib/desk/tools-run";
 import type { CustomMode, DeskTool } from "@/lib/desk/types";
 import { filesFromPath, pickFilePath } from "@/lib/desk/desktop";
 import { sourceFolderFiles } from "@/lib/desk/storage";
@@ -27,7 +27,7 @@ export function ToolsView() {
             <li key={item.id} className={cx("border-b border-line last:border-b-0", item.id === tool.id && "bg-gold/15")}>
               <button type="button" className="w-full px-4 py-3 text-left" onClick={() => setTool(item.id)}>
                 <span className="block font-medium">{item.name}</span>
-                <span className="text-sm text-muted">{item.pinned ? "On the dashboard" : "In the library"}</span>
+                <span className="text-sm text-muted">{item.pinned ? "On the menu" : "In the library"}</span>
               </button>
             </li>
           ))}
@@ -199,6 +199,7 @@ function Runner({ tool, onPin, onRemove }: { tool: DeskTool; onPin: () => void; 
   const [result, setResult] = useState<ToolResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [hot, setHot] = useState(false);
+  const [dropKey, setDropKey] = useState(0);
   const macro = tool.kind === "ax" || tool.kind === "infotrack" || tool.kind === "kindertons";
   const needs = tool.kind === "ax" || tool.kind === "infotrack" || tool.kind === "kindertons" ? MACRO_NEEDS[tool.kind] : [];
   const several = tool.kind === "bundle" || tool.kind === "kindertons" || tool.kind === "ax";
@@ -224,6 +225,16 @@ function Runner({ tool, onPin, onRemove }: { tool: DeskTool; onPin: () => void; 
     setBusy(false);
   }
 
+  function finish() {
+    setResult(null);
+    setFiles([]);
+    setAccident("");
+    setDob("");
+    setClient("");
+    setHot(false);
+    setDropKey((key) => key + 1);
+  }
+
   return (
     <section className="card overflow-hidden">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-4">
@@ -233,7 +244,7 @@ function Runner({ tool, onPin, onRemove }: { tool: DeskTool; onPin: () => void; 
         </div>
         <button type="button" className="btn btn-ghost" onClick={onPin}>
           <Pin className="size-4" aria-hidden="true" />
-          {tool.pinned ? "Unpin" : "Pin to dashboard"}
+          {tool.pinned ? "Unpin" : "Pin to menu"}
         </button>
       </div>
       <div className="grid gap-4 px-5 py-4">
@@ -291,6 +302,7 @@ function Runner({ tool, onPin, onRemove }: { tool: DeskTool; onPin: () => void; 
                   : "Drop a spreadsheet, or browse"}
           </span>
           <input
+            key={dropKey}
             className="sr-only"
             type="file"
             multiple={several}
@@ -299,22 +311,40 @@ function Runner({ tool, onPin, onRemove }: { tool: DeskTool; onPin: () => void; 
         </label>
         <p className="text-sm text-muted">
           {tool.kind === "ax"
-            ? "Source references come from the AX case list path in settings. Open in Outlook brings up the remittance for you to send."
+            ? "Source references come from the AX case list path in settings. Open in Outlook attaches the remittance. Drop or browse if you want a different file."
             : tool.kind === "infotrack"
               ? "You get the ledger, the nominal sheet and the filtered ledger."
               : tool.kind === "kindertons"
-                ? "The case list and handler addresses come from the paths in settings. Open in Outlook brings up the court-fee email, then one for each handler."
+                ? "The case list and handler addresses come from the paths in settings. Open in Outlook attaches the workbook. Drop or browse to use a different file."
                 : "The desk writes a finished workbook you can download."}
         </p>
-        {result ? <ResultCard result={result} name={tool.name} /> : null}
+        {result ? <ResultCard result={result} name={tool.name} onComplete={finish} /> : null}
       </div>
     </section>
   );
 }
 
-function ResultCard({ result, name }: { result: ToolResult; name: string }) {
+function ResultCard({ result, name, onComplete }: { result: ToolResult; name: string; onComplete: () => void }) {
+  const user = useDesk((s) => s.user);
+  const [attachment, setAttachment] = useState<File | null>(null);
+  const [hot, setHot] = useState(false);
+  const [note, setNote] = useState("");
   const rows = result.sheets[0]?.rows.slice(0, 8) ?? [];
   const headers = rows[0] ? Object.keys(rows[0]) : [];
+  const made = result.filename || `${name}.xlsx`;
+
+  async function send(mail: MailDraft) {
+    setNote("");
+    const chosen = attachment
+      ? { name: attachment.name, base64: bytesToBase64(new Uint8Array(await attachment.arrayBuffer())) }
+      : { name: made, base64: bytesToBase64(resultWorkbook(result)) };
+    try {
+      await openOutlook(mail, chosen, user?.username);
+    } catch (error) {
+      setNote(error instanceof Error ? error.message : "Outlook could not be opened.");
+    }
+  }
+
   return (
     <div className="rounded-md border border-line">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
@@ -329,7 +359,7 @@ function ResultCard({ result, name }: { result: ToolResult; name: string }) {
           <button
             type="button"
             className="btn btn-navy"
-            onClick={() => downloadBytes(resultWorkbook(result), result.filename || `${name}.xlsx`, XLSX_MIME)}
+            onClick={() => downloadBytes(resultWorkbook(result), made, XLSX_MIME)}
           >
             Download result
           </button>
@@ -338,16 +368,37 @@ function ResultCard({ result, name }: { result: ToolResult; name: string }) {
               key={`${mail.subject}-${mail.to}`}
               type="button"
               className="btn btn-gold"
-              onClick={() => {
-                if (index === 0) downloadBytes(resultWorkbook(result), result.filename || `${name}.xlsx`, XLSX_MIME);
-                openOutlook(mail);
-              }}
+              onClick={() => void send(mail)}
             >
               {index === 0 ? "Open in Outlook" : mail.subject}
             </button>
           ))}
+          <button type="button" className="btn btn-gold" onClick={onComplete}>Complete</button>
         </div>
       </div>
+      {result.emails?.length ? (
+        <label
+          className={cx("m-4 block cursor-pointer rounded-md border border-dashed border-line px-3 py-3 text-center text-sm", hot && "border-gold bg-gold/10")}
+          onDragOver={(event) => {
+            event.preventDefault();
+            setHot(true);
+          }}
+          onDragLeave={() => setHot(false)}
+          onDrop={(event) => {
+            event.preventDefault();
+            setHot(false);
+            const file = event.dataTransfer.files[0];
+            if (file) setAttachment(file);
+          }}
+        >
+          <span className="font-medium text-navy">
+            {attachment ? `Attached: ${attachment.name}` : `Attached: ${made}`}
+          </span>
+          <span className="mt-1 block text-muted">Drop a file here, or browse, to attach something else.</span>
+          <input className="sr-only" type="file" onChange={(event) => setAttachment(event.target.files?.[0] ?? null)} />
+        </label>
+      ) : null}
+      {note ? <p className="px-4 pb-3 text-sm text-muted">{note}</p> : null}
       {headers.length ? (
         <div className="overflow-auto">
           <table className="w-full text-left text-sm">

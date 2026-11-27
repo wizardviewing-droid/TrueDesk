@@ -436,6 +436,8 @@ export function downloadBytes(bytes: Uint8Array, filename: string, mime: string)
   URL.revokeObjectURL(url);
 }
 
+export type MailFile = { name: string; base64: string };
+
 function mailList(value: string): string {
   return value
     .split(/[;,]/)
@@ -444,18 +446,37 @@ function mailList(value: string): string {
     .join(",");
 }
 
-export function openOutlook(mail: MailDraft) {
-  const query = new URLSearchParams();
-  if (mail.cc) query.set("cc", mailList(mail.cc));
-  query.set("subject", mail.subject);
-  query.set("body", mail.body);
-  const href = `mailto:${mailList(mail.to)}?${query.toString()}`;
+export function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const size = 0x8000;
+  for (let index = 0; index < bytes.length; index += size) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + size));
+  }
+  return btoa(binary);
+}
+
+function mailtoHref(mail: MailDraft): string {
+  const parts = [`subject=${encodeURIComponent(mail.subject)}`, `body=${encodeURIComponent(mail.body)}`];
+  if (mail.cc) parts.unshift(`cc=${encodeURIComponent(mailList(mail.cc))}`);
+  return `mailto:${mailList(mail.to)}?${parts.join("&")}`;
+}
+
+export async function openOutlook(mail: MailDraft, file?: MailFile, username?: string) {
+  const payload = {
+    to: mailList(mail.to),
+    cc: mail.cc ? mailList(mail.cc) : "",
+    subject: mail.subject,
+    body: mail.body,
+    username: username ?? "",
+    fileName: file?.name ?? "",
+    fileBase64: file?.base64 ?? "",
+  };
   if (typeof window !== "undefined" && window.trueDesk) {
-    void window.trueDesk.openOutlook(href);
+    await window.trueDesk.openOutlook(payload);
     return;
   }
   const link = document.createElement("a");
-  link.href = href;
+  link.href = mailtoHref(mail);
   link.click();
 }
 

@@ -20,7 +20,15 @@ declare global {
       pickFile: () => Promise<string | null>;
       focusWindow?: () => Promise<void>;
       clearAttention?: () => Promise<void>;
-      openOutlook: (url: string) => Promise<void>;
+      openOutlook: (payload: {
+        to: string;
+        cc: string;
+        subject: string;
+        body: string;
+        username: string;
+        fileName: string;
+        fileBase64: string;
+      }) => Promise<void>;
       openFile: (username: string, name: string, base64: string) => Promise<void>;
       readVault: () => Promise<{ json: string | null; application: boolean; backup: boolean }>;
       writeVault: (json: string) => Promise<{ application: boolean; backup: boolean }>;

@@ -1,4 +1,5 @@
 const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
+const { spawn } = require("child_process");
 const fs = require("fs");
 const http = require("http");
 const os = require("os");
@@ -96,10 +97,50 @@ ipcMain.handle("clear-attention", () => {
   for (const window of BrowserWindow.getAllWindows()) window.flashFrame(false);
 });
 
-ipcMain.handle("open-outlook", async (_event, url) => {
-  if (typeof url !== "string" || !url.startsWith("mailto:")) throw new Error("Not an email link.");
-  await shell.openExternal(url);
+ipcMain.handle("open-outlook", async (_event, payload) => {
+  if (!payload || typeof payload !== "object") throw new Error("That email could not be opened.");
+  const to = String(payload.to || "").replace(/[\r\n]/g, "").slice(0, 2000);
+  const cc = String(payload.cc || "").replace(/[\r\n]/g, "").slice(0, 2000);
+  const subject = String(payload.subject || "").slice(0, 500);
+  const body = String(payload.body || "").slice(0, 8000);
+  let filePath = "";
+  if (payload.fileBase64 && payload.fileName && payload.username) {
+    const folder = path.join(userFolder(APPLICATION, assertUsername(String(payload.username))), "opened");
+    await fs.promises.mkdir(folder, { recursive: true });
+    const raw = path.basename(String(payload.fileName)).replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_").trim().slice(0, 180);
+    filePath = path.join(folder, raw || "attachment");
+    const packed = String(payload.fileBase64);
+    if (packed.length > 56_000_000) throw new Error("That file is too large to attach.");
+    await fs.promises.writeFile(filePath, Buffer.from(packed, "base64"));
+  }
+  const opened = await outlookMessage({ to, cc, subject, body, filePath });
+  if (opened) return;
+  const parts = [`subject=${encodeURIComponent(subject)}`, `body=${encodeURIComponent(body)}`];
+  if (cc) parts.unshift(`cc=${encodeURIComponent(cc)}`);
+  await shell.openExternal(`mailto:${to}?${parts.join("&")}`);
 });
+
+function outlookMessage({ to, cc, subject, body, filePath }) {
+  return new Promise((resolve) => {
+    const script = [
+      "$ErrorActionPreference = 'Stop'",
+      "$outlook = New-Object -ComObject Outlook.Application",
+      "$mail = $outlook.CreateItem(0)",
+      "$mail.To = $env:TD_TO",
+      "if ($env:TD_CC) { $mail.CC = $env:TD_CC }",
+      "$mail.Subject = $env:TD_SUBJECT",
+      "$mail.Body = $env:TD_BODY",
+      "if ($env:TD_FILE -and (Test-Path -LiteralPath $env:TD_FILE)) { $null = $mail.Attachments.Add($env:TD_FILE) }",
+      "$mail.Display()",
+    ].join("; ");
+    const child = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], {
+      env: { ...process.env, TD_TO: to, TD_CC: cc, TD_SUBJECT: subject, TD_BODY: body, TD_FILE: filePath },
+      windowsHide: true,
+    });
+    child.on("error", () => resolve(false));
+    child.on("exit", (code) => resolve(code === 0));
+  });
+}
 
 ipcMain.handle("open-file", async (_event, username, name, base64) => {
   if (typeof name !== "string" || typeof base64 !== "string" || !base64) throw new Error("That file could not be opened.");
