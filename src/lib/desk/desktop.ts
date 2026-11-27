@@ -4,7 +4,7 @@ type DesktopApi = {
   readSpreadsheets: (target: string) => Promise<DesktopFile[]>;
   pickFile: () => Promise<string | null>;
   openOutlook: (url: string) => Promise<void>;
-  openFile: (name: string, base64: string) => Promise<void>;
+  openFile: (username: string, name: string, base64: string) => Promise<void>;
 };
 
 export function desktopApi(): DesktopApi | null {

@@ -14,6 +14,7 @@ import {
   installDeskRelease,
   linkFolder,
   persist,
+  publishViews,
   readDeskRelease,
   readFile,
   readSharedDesk,
@@ -368,6 +369,7 @@ export const useDesk = create<State>((set, get) => {
       const data = withStandardTools(result.data);
       set({ user: result.user, data, view: "today", editorId: null, phase: "saved" });
       if (data !== result.data) void enqueue("auto");
+      void publishViews(data);
       void get().checkRelease();
       return null;
     },
@@ -377,6 +379,7 @@ export const useDesk = create<State>((set, get) => {
       const data = withStandardTools(result.data);
       set({ user: result.user, data, view: "today", editorId: null, phase: "saved" });
       if (data !== result.data) void enqueue("auto");
+      void publishViews(data);
       void get().checkRelease();
       return null;
     },
@@ -529,7 +532,7 @@ export const useDesk = create<State>((set, get) => {
           toast = `Sent to the ${label}.`;
         });
         if (toast) get().showToast(toast);
-        for (const copy of copies) void copyStoredFile(copy.from, copy.to);
+        for (const copy of copies) void copyStoredFile(copy.from, copy.to, user.username);
         return;
       }
       let toast = "";
@@ -700,7 +703,7 @@ export const useDesk = create<State>((set, get) => {
       if (!user) return;
       let added = 0;
       for (const file of files) {
-        const stored = await storeFile(file);
+        const stored = await storeFile(file, user.username);
         if ("error" in stored) {
           get().showToast(stored.error);
           continue;
@@ -757,7 +760,8 @@ export const useDesk = create<State>((set, get) => {
       const file = get().data?.attachments.find((item) => item.id === id);
       if (!file) return;
       try {
-        const opened = await readFile(file.id, file.name, file.mime);
+        const owner = get().data?.users.find((person) => person.id === file.addedBy)?.username || get().user?.username;
+        const opened = owner ? await readFile(file.id, file.name, file.mime, owner) : false;
         if (!opened) get().showToast("That file is not on this desk any more.");
       } catch (error) {
         get().showToast(error instanceof Error ? error.message : "That file could not be opened.");

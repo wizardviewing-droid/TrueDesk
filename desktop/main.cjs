@@ -1,8 +1,13 @@
 const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const fs = require("fs");
 const http = require("http");
+const os = require("os");
 const path = require("path");
 const { pathToFileURL } = require("url");
+
+const APPLICATION = "Y:\\accounts\\Tools\\Task application";
+const runtimeWho = String(os.userInfo().username || "desk").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 40) || "desk";
+app.setPath("userData", path.join(APPLICATION, "_runtime", runtimeWho));
 
 const PORT = 4173;
 const SHEET = /\.(xlsx|xlsm|xlsb|xls|csv)$/i;
@@ -96,13 +101,12 @@ ipcMain.handle("open-outlook", async (_event, url) => {
   await shell.openExternal(url);
 });
 
-ipcMain.handle("open-file", async (_event, name, base64) => {
+ipcMain.handle("open-file", async (_event, username, name, base64) => {
   if (typeof name !== "string" || typeof base64 !== "string" || !base64) throw new Error("That file could not be opened.");
+  const folder = path.join(userFolder(APPLICATION, assertUsername(username)), "opened");
+  await fs.promises.mkdir(folder, { recursive: true });
   const raw = path.basename(name).replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_").trim().slice(0, 180);
-  const safe = raw || "attachment";
-  const dir = path.join(app.getPath("temp"), "TrueDesk");
-  await fs.promises.mkdir(dir, { recursive: true });
-  const dest = path.join(dir, `${Date.now()}-${safe}`);
+  const dest = path.join(folder, raw || "attachment");
   await fs.promises.writeFile(dest, Buffer.from(base64, "base64"));
   const error = await shell.openPath(dest);
   if (error) throw new Error(error);
@@ -132,11 +136,11 @@ ipcMain.handle("read-spreadsheets", async (_event, target) => {
 });
 
 const ROOTS = {
-  application: "Y:\\accounts\\Tools\\Task application",
+  application: APPLICATION,
   backup: "Y:\\accounts\\Task app backup",
 };
 const USERNAME = /^[a-z0-9.]{3,24}$/;
-const RESERVED = new Set(["update", "attachments"]);
+const RESERVED = new Set(["update", "attachments", "tools", "_runtime"]);
 const FILE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function assertUsername(username) {
@@ -256,26 +260,82 @@ ipcMain.handle("delete-profile", async (_event, username) => {
   }
 });
 
+async function attachmentHits(fileId) {
+  const hits = [];
+  for (const slot of ["application", "backup"]) {
+    let names = [];
+    try {
+      names = await fs.promises.readdir(ROOTS[slot]);
+    } catch {
+      names = [];
+    }
+    for (const name of names) {
+      if (!USERNAME.test(name) || RESERVED.has(name)) continue;
+      const file = path.join(ROOTS[slot], name, "files", `${fileId}.bin`);
+      try {
+        await fs.promises.access(file);
+        hits.push({ legacy: false, file });
+      } catch {
+        /* Not in this profile. */
+      }
+    }
+    const legacy = path.join(ROOTS[slot], "attachments", `${fileId}.bin`);
+    try {
+      await fs.promises.access(legacy);
+      hits.push({ legacy: true, file: legacy });
+    } catch {
+      /* No old shared copy. */
+    }
+  }
+  return hits;
+}
+
 ipcMain.handle("read-attachment", async (_event, id) => {
   const fileId = assertFileId(id);
-  for (const slot of ["application", "backup"]) {
-    const buf = await readOptional(path.join(ROOTS[slot], "attachments", `${fileId}.bin`));
+  const hits = await attachmentHits(fileId);
+  for (const hit of hits) {
+    const buf = await readOptional(hit.file);
     if (buf) return buf.toString("base64");
   }
   return null;
 });
 
-ipcMain.handle("write-attachment", async (_event, id, base64) => {
+ipcMain.handle("write-attachment", async (_event, username, id, base64) => {
+  const name = assertUsername(username);
   const fileId = assertFileId(id);
   if (typeof base64 !== "string" || !base64 || base64.length > 56_000_000) throw new Error("That file could not be saved.");
-  return writeBoth(["attachments", `${fileId}.bin`], Buffer.from(base64, "base64"));
+  return writeBoth([name, "files", `${fileId}.bin`], Buffer.from(base64, "base64"));
+});
+
+ipcMain.handle("claim-attachment", async (_event, username, id) => {
+  const name = assertUsername(username);
+  const fileId = assertFileId(id);
+  const hits = await attachmentHits(fileId);
+  const legacy = hits.find((hit) => hit.legacy);
+  if (!legacy) return;
+  const buf = await readOptional(legacy.file);
+  if (!buf) return;
+  await writeBoth([name, "files", `${fileId}.bin`], buf);
+  for (const slot of ["application", "backup"]) {
+    await fs.promises.rm(path.join(ROOTS[slot], "attachments", `${fileId}.bin`), { force: true });
+  }
 });
 
 ipcMain.handle("delete-attachment", async (_event, id) => {
   const fileId = assertFileId(id);
-  for (const slot of ["application", "backup"]) {
-    await fs.promises.rm(path.join(ROOTS[slot], "attachments", `${fileId}.bin`), { force: true });
-  }
+  const hits = await attachmentHits(fileId);
+  await Promise.all(hits.map((hit) => fs.promises.rm(hit.file, { force: true })));
+});
+
+ipcMain.handle("write-tools", async (_event, json) => {
+  if (typeof json !== "string" || !json || json.length > 8_000_000) throw new Error("The tools could not be saved.");
+  return writeBoth(["tools", "tools.json"], json);
+});
+
+ipcMain.handle("write-user-tasks", async (_event, username, json) => {
+  const name = assertUsername(username);
+  if (typeof json !== "string" || !json || json.length > 8_000_000) throw new Error("Those tasks could not be saved.");
+  return writeBoth([name, "tasks.json"], json);
 });
 
 ipcMain.handle("read-release", async () => {

@@ -37,7 +37,7 @@ type ProfileFile = {
   wrap: Wrap;
 };
 
-const RESERVED_USERS = new Set(["update", "attachments"]);
+const RESERVED_USERS = new Set(["update", "attachments", "tools", "_runtime"]);
 const handles = new Map<string, FileSystemDirectoryHandle>();
 const memoryBlobs = new Map<string, StoredBlob>();
 
@@ -174,6 +174,7 @@ async function writeSinks(json: string, data: DeskData | null): Promise<{ inSync
   if (data) {
     const profileError = await writeProfiles(data);
     if (profileError) return { inSync: false, message: profileError };
+    await publishViews(data);
   }
   return report;
 }
@@ -350,6 +351,32 @@ export async function changePassword(username: string, password: string): Promis
   return null;
 }
 
+export async function publishViews(data: DeskData): Promise<void> {
+  const savedAt = new Date().toISOString();
+  try {
+    await deskDisk().writeTools(JSON.stringify({ savedAt, tools: data.tools }, null, 2));
+  } catch {
+    /* The vault is already saved. The tools file is written on the next save. */
+  }
+  for (const user of data.users) {
+    const tasks = data.tasks.filter((task) => task.assigneeId === user.id || task.ownerId === user.id);
+    const ids = new Set(tasks.map((task) => task.id));
+    const body = {
+      savedAt,
+      tasks,
+      notes: data.notes.filter((note) => ids.has(note.taskId)),
+      files: data.attachments
+        .filter((file) => ids.has(file.taskId))
+        .map((file) => ({ id: file.id, taskId: file.taskId, name: file.name, size: file.size, addedAt: file.addedAt })),
+    };
+    try {
+      await deskDisk().writeUserTasks(user.username, JSON.stringify(body, null, 2));
+    } catch {
+      /* This person's task file is written on the next save. */
+    }
+  }
+}
+
 export async function persist(
   data: DeskData,
   reason: "auto" | "manual" | "checkpoint" | "close",
@@ -435,13 +462,13 @@ async function blobGet(id: string): Promise<StoredBlob | null> {
   return stored;
 }
 
-export async function storeFile(file: File): Promise<{ id: string } | { error: string }> {
+export async function storeFile(file: File, username: string): Promise<{ id: string } | { error: string }> {
   if (!session) return { error: "Sign in again before attaching a file." };
   if (file.size > 40 * 1024 * 1024) return { error: `${file.name} is over 40 MB.` };
   const id = crypto.randomUUID();
   const sealed = await encryptBlob(session.master, await file.arrayBuffer());
   try {
-    const status = await deskDisk().writeAttachment(id, packBlob(sealed));
+    const status = await deskDisk().writeAttachment(username, id, packBlob(sealed));
     if (!status.application && !status.backup) return { error: "That file could not be saved to the shared drive." };
   } catch {
     return { error: "That file could not be saved to the shared drive." };
@@ -450,24 +477,29 @@ export async function storeFile(file: File): Promise<{ id: string } | { error: s
   return { id };
 }
 
-export async function copyStoredFile(fromId: string, toId: string): Promise<void> {
+export async function copyStoredFile(fromId: string, toId: string, username: string): Promise<void> {
   const stored = await blobGet(fromId);
   if (!stored || !session) return;
   memoryBlobs.set(toId, stored);
   try {
-    await deskDisk().writeAttachment(toId, packBlob(stored));
+    await deskDisk().writeAttachment(username, toId, packBlob(stored));
   } catch {
     /* The task copy is saved. The file can be opened from the original task. */
   }
 }
 
-export async function readFile(id: string, name: string, mime: string): Promise<boolean> {
+export async function readFile(id: string, name: string, mime: string, username: string): Promise<boolean> {
   if (!session) return false;
   const stored = await blobGet(id);
   if (!stored) return false;
+  try {
+    await deskDisk().claimAttachment(username, id);
+  } catch {
+    /* Opening still works if the old copy is the one that was read. */
+  }
   const plain = await decryptBlob(session.master, stored.iv, stored.data);
   if (window.trueDesk?.openFile) {
-    await window.trueDesk.openFile(name, toB64(plain));
+    await window.trueDesk.openFile(username, name, toB64(plain));
     return true;
   }
   const blob = new Blob([plain], { type: mime || "application/octet-stream" });

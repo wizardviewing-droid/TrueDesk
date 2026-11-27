@@ -11,15 +11,7 @@ export function AcceptModal() {
   const declineTask = useDesk((s) => s.declineTask);
   const openTask = useDesk((s) => s.openTask);
   const downloadAttachment = useDesk((s) => s.downloadAttachment);
-  const [snoozed, setSnoozed] = useState<string[]>(() => {
-    if (typeof sessionStorage === "undefined") return [];
-    try {
-      const stored = JSON.parse(sessionStorage.getItem("truedesk-snooze") || "[]") as unknown;
-      return Array.isArray(stored) ? stored.filter((item): item is string => typeof item === "string") : [];
-    } catch {
-      return [];
-    }
-  });
+  const [snoozed, setSnoozed] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [declining, setDeclining] = useState(false);
@@ -35,7 +27,6 @@ export function AcceptModal() {
 
   useEffect(() => {
     const wake = () => {
-      sessionStorage.removeItem("truedesk-snooze");
       setSnoozed([]);
       setOpen(true);
       setDeclining(false);
@@ -46,7 +37,6 @@ export function AcceptModal() {
 
   function snooze() {
     const next = [...new Set([...snoozed, ...pending.map((task) => task.id)])];
-    sessionStorage.setItem("truedesk-snooze", JSON.stringify(next));
     setSnoozed(next);
     setOpen(false);
     setDeclining(false);

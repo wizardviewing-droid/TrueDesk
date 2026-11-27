@@ -11,8 +11,11 @@ export type DeskDisk = {
   writeProfile: (username: string, json: string) => Promise<DiskStatus>;
   deleteProfile: (username: string) => Promise<void>;
   readAttachment: (id: string) => Promise<string | null>;
-  writeAttachment: (id: string, base64: string) => Promise<DiskStatus>;
+  writeAttachment: (username: string, id: string, base64: string) => Promise<DiskStatus>;
+  claimAttachment: (username: string, id: string) => Promise<void>;
   deleteAttachment: (id: string) => Promise<void>;
+  writeTools: (json: string) => Promise<DiskStatus>;
+  writeUserTasks: (username: string, json: string) => Promise<DiskStatus>;
   readRelease: () => Promise<string | null>;
 };
 
@@ -20,6 +23,8 @@ const preview = {
   vault: null as string | null,
   profiles: new Map<string, string>(),
   files: new Map<string, string>(),
+  tools: null as string | null,
+  userTasks: new Map<string, string>(),
   release: null as string | null,
 };
 
@@ -42,13 +47,34 @@ function previewDisk(): DeskDisk {
     deleteProfile: async (username) => {
       preview.profiles.delete(username);
     },
-    readAttachment: async (id) => preview.files.get(id) ?? null,
-    writeAttachment: async (id, base64) => {
-      preview.files.set(id, base64);
+    readAttachment: async (id) => {
+      for (const [key, value] of preview.files) {
+        if (key === id || key.endsWith(`/${id}`)) return value;
+      }
+      return null;
+    },
+    writeAttachment: async (username, id, base64) => {
+      preview.files.set(`${username}/${id}`, base64);
       return both;
     },
-    deleteAttachment: async (id) => {
+    claimAttachment: async (username, id) => {
+      const legacy = preview.files.get(id);
+      if (!legacy) return;
+      preview.files.set(`${username}/${id}`, legacy);
       preview.files.delete(id);
+    },
+    deleteAttachment: async (id) => {
+      for (const key of [...preview.files.keys()]) {
+        if (key === id || key.endsWith(`/${id}`)) preview.files.delete(key);
+      }
+    },
+    writeTools: async (json) => {
+      preview.tools = json;
+      return both;
+    },
+    writeUserTasks: async (username, json) => {
+      preview.userTasks.set(username, json);
+      return both;
     },
     readRelease: async () => preview.release,
   };
@@ -67,8 +93,11 @@ function sharedDisk(api: SharedApi): DeskDisk {
     writeProfile: (username, json) => api.writeProfile(username, json),
     deleteProfile: (username) => api.deleteProfile(username),
     readAttachment: (id) => api.readAttachment(id),
-    writeAttachment: (id, base64) => api.writeAttachment(id, base64),
+    writeAttachment: (username, id, base64) => api.writeAttachment(username, id, base64),
+    claimAttachment: (username, id) => api.claimAttachment(username, id),
     deleteAttachment: (id) => api.deleteAttachment(id),
+    writeTools: (json) => api.writeTools(json),
+    writeUserTasks: (username, json) => api.writeUserTasks(username, json),
     readRelease: () => api.readRelease(),
   };
 }
