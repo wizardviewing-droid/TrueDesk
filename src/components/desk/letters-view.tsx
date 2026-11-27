@@ -349,6 +349,7 @@ export function LettersDesk({ tool }: { tool: DeskTool }) {
       </div>
       <div className="flex flex-wrap gap-2">
         <button type="button" className="btn btn-ghost" onClick={() => setLines((current) => [...current, emptyLine()])}>Add a row</button>
+        <button type="button" className="btn btn-ghost" onClick={() => { setLines(pad([])); setSelected(""); setRan(false); setNote(""); }}>Clear</button>
         <button type="button" className="btn btn-navy" disabled={Boolean(busy)} onClick={() => void checkFiles()}>Check files</button>
         <button type="button" className="btn btn-gold" disabled={Boolean(busy)} onClick={() => void saveList()}>Save today's list</button>
       </div>

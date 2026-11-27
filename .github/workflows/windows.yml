@@ -40,7 +40,7 @@ jobs:
       - name: Zip the app
         shell: pwsh
         run: |
-          Set-Content -Path desktop/release/version.txt -Value "1.0.30" -NoNewline
+          Set-Content -Path desktop/release/version.txt -Value "1.0.31" -NoNewline
           Compress-Archive -Force -Path desktop/release/TrueDesk.exe, desktop/release/version.txt -DestinationPath desktop/release/TrueDesk.zip
       - name: Keep a copy of the zip
         uses: actions/upload-artifact@v4
@@ -54,8 +54,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          tag=v1.0.30
-          notes="Windows app for the accounts desk. Unzip TrueDesk.zip into Y:\\accounts\\Tools\\Task application. Save today's list now writes Email letters and SF bills - the date into Letters to be sent."
+          tag=v1.0.31
+          notes="Windows app for the accounts desk. Unzip TrueDesk.zip into Y:\\accounts\\Tools\\Task application. Letters and SF bills is back. Delete a tool from its settings. Clear resets the page."
           for i in 1 2 3 4 5 6; do
             if gh release view "$tag" >/dev/null 2>&1; then
               break

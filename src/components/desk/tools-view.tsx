@@ -16,6 +16,7 @@ export function ToolsView() {
   const setTool = useDesk((s) => s.setTool);
   const togglePin = useDesk((s) => s.togglePin);
   const removeTool = useDesk((s) => s.removeTool);
+  const user = useDesk((s) => s.user);
   const setLookupPath = useDesk((s) => s.setLookupPath);
   const [settingsFor, setSettingsFor] = useState<string | null>(null);
   const tool = data?.tools.find((item) => item.id === toolId) ?? data?.tools[0];
@@ -43,11 +44,16 @@ export function ToolsView() {
           ))}
         </ul>
       </aside>
-      <Runner key={tool.id} tool={tool} onPin={() => togglePin(tool.id)} onRemove={() => removeTool(tool.id)} onSettings={() => setSettingsFor(tool.id)} />
+      <Runner key={tool.id} tool={tool} onPin={() => togglePin(tool.id)} onSettings={() => setSettingsFor(tool.id)} />
       {settingsTool ? (
         <ToolSettings
           tool={settingsTool}
+          manager={user?.role === "manager"}
           onClose={() => setSettingsFor(null)}
+          onDelete={() => {
+            removeTool(settingsTool.id);
+            setSettingsFor(null);
+          }}
           onSave={(paths) => {
             for (const [sourceId, path] of Object.entries(paths)) setLookupPath(settingsTool.id, sourceId, path);
             setSettingsFor(null);
@@ -60,18 +66,23 @@ export function ToolsView() {
 
 function ToolSettings({
   tool,
+  manager,
   onClose,
   onSave,
+  onDelete,
 }: {
   tool: DeskTool;
+  manager: boolean;
   onClose: () => void;
   onSave: (paths: Record<string, string>) => void;
+  onDelete: () => void;
 }) {
   const needs = tool.kind === "ax" || tool.kind === "infotrack" || tool.kind === "kindertons" || tool.kind === "letters" ? MACRO_NEEDS[tool.kind] : [];
   const [paths, setPaths] = useState<Record<string, string>>(() =>
     Object.fromEntries(needs.map((need) => [need.id, tool.lookups?.find((item) => item.id === need.id)?.path || LETTER_PATHS[need.id] || ""])),
   );
   const [note, setNote] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   async function choose(sourceId: string) {
     const folder = needs.find((need) => need.id === sourceId)?.folder;
@@ -124,6 +135,19 @@ function ToolSettings({
           <button type="submit" className="btn btn-gold">Save</button>
           <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
         </div>
+        {manager ? (
+          <div className="border-t border-line pt-4">
+            {confirmDelete ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm text-muted">Delete {tool.name} from the library?</p>
+                <button type="button" className="btn bg-card text-danger shadow-sm" onClick={onDelete}>Delete this tool</button>
+                <button type="button" className="btn btn-ghost" onClick={() => setConfirmDelete(false)}>Cancel</button>
+              </div>
+            ) : (
+              <button type="button" className="btn bg-card text-danger shadow-sm" onClick={() => setConfirmDelete(true)}>Delete this tool</button>
+            )}
+          </div>
+        ) : null}
       </form>
     </div>
   );
@@ -141,7 +165,7 @@ function toolLook(kind: string): { wash: string; ink: string; chip: string; eyeb
   return { wash: "from-[#eef6ff] via-[#f6f1ff] to-[#fff6dc]", ink: "text-navy", chip: "bg-[#d9ebff]", eyebrow: "Desk tool" };
 }
 
-function Runner({ tool, onPin, onRemove, onSettings }: { tool: DeskTool; onPin: () => void; onRemove: () => void; onSettings: () => void }) {
+function Runner({ tool, onPin, onSettings }: { tool: DeskTool; onPin: () => void; onSettings: () => void }) {
   const user = useDesk((s) => s.user);
   const [files, setFiles] = useState<File[]>([]);
   const [accident, setAccident] = useState("");
@@ -151,7 +175,6 @@ function Runner({ tool, onPin, onRemove, onSettings }: { tool: DeskTool; onPin: 
   const [busy, setBusy] = useState(false);
   const [hot, setHot] = useState(false);
   const [dropKey, setDropKey] = useState(0);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const macro = tool.kind === "ax" || tool.kind === "infotrack" || tool.kind === "kindertons";
   const needs = tool.kind === "ax" || tool.kind === "infotrack" || tool.kind === "kindertons" ? MACRO_NEEDS[tool.kind] : [];
   const several = tool.kind === "bundle" || tool.kind === "kindertons" || tool.kind === "ax";
@@ -188,7 +211,6 @@ function Runner({ tool, onPin, onRemove, onSettings }: { tool: DeskTool; onPin: 
   }
 
   const look = toolLook(isLetters(tool) ? "letters" : tool.kind);
-  const manager = user?.role === "manager";
 
   if (isLetters(tool)) {
     return (
@@ -206,16 +228,6 @@ function Runner({ tool, onPin, onRemove, onSettings }: { tool: DeskTool; onPin: 
               <Pin className="size-4" aria-hidden="true" />
               {tool.pinned ? "Unpin" : "Pin to menu"}
             </button>
-            {manager ? (
-              confirmDelete ? (
-                <>
-                  <button type="button" className="btn bg-card text-danger shadow-sm" onClick={onRemove}>Delete this tool</button>
-                  <button type="button" className="btn bg-card text-navy shadow-sm" onClick={() => setConfirmDelete(false)}>Cancel</button>
-                </>
-              ) : (
-                <button type="button" className="btn bg-card text-danger shadow-sm" onClick={() => setConfirmDelete(true)}>Delete</button>
-              )
-            ) : null}
           </div>
         </div>
         <div className="px-5 py-5">
@@ -242,16 +254,6 @@ function Runner({ tool, onPin, onRemove, onSettings }: { tool: DeskTool; onPin: 
             <Pin className="size-4" aria-hidden="true" />
             {tool.pinned ? "Unpin" : "Pin to menu"}
           </button>
-          {manager ? (
-            confirmDelete ? (
-              <>
-                <button type="button" className="btn bg-card text-danger shadow-sm" onClick={onRemove}>Delete this tool</button>
-                <button type="button" className="btn bg-card text-navy shadow-sm" onClick={() => setConfirmDelete(false)}>Cancel</button>
-              </>
-            ) : (
-              <button type="button" className="btn bg-card text-danger shadow-sm" onClick={() => setConfirmDelete(true)}>Delete</button>
-            )
-          ) : null}
         </div>
       </div>
       <div className="grid gap-4 px-5 py-5">
@@ -281,6 +283,7 @@ function Runner({ tool, onPin, onRemove, onSettings }: { tool: DeskTool; onPin: 
           {canSample && (files.length || accident) ? (
             <button type="button" className="btn btn-ghost" onClick={() => void run(true)}>Use the sample instead</button>
           ) : null}
+          <button type="button" className="btn btn-ghost" onClick={finish}>Clear</button>
         </div>
         <label
           data-tool-drop

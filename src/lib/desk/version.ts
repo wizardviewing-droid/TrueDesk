@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.0.30";
+export const APP_VERSION = "1.0.31";
 
 export function isNewerVersion(next: string, current: string): boolean {
   const parts = (value: string) => value.split(".").map((part) => Number.parseInt(part, 10) || 0);

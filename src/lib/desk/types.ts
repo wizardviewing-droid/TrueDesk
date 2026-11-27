@@ -131,6 +131,7 @@ export type DeskData = {
   attachments: Attachment[];
   tools: DeskTool[];
   retiredTools?: string[];
+  restoredTools?: string[];
   activity: Activity[];
   notices: Notice[];
 };
