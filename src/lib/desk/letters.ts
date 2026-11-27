@@ -2,8 +2,10 @@ export const LETTER_TO = "proclaim@true.co.uk";
 
 export const LETTER_PATHS: Record<string, string> = {
   bills: "Y:\\accounts\\success fee bills\\",
-  lists: "Y:\\accounts\\Tools\\Task application",
+  lists: "Y:\\accounts\\BANK UPLOADS & PAYMENTS\\LETTERS TO BE SENT",
 };
+
+export const OLD_LISTS_PATH = "Y:\\accounts\\Tools\\Task application";
 
 const MONTHS = [
   "January",
@@ -37,7 +39,9 @@ export function matterLines(value: string): string[] {
 export function listStamp(when = new Date()): { year: string; month: string; name: string } {
   const year = String(when.getFullYear());
   const month = MONTHS[when.getMonth()] ?? "January";
-  return { year, month, name: `${when.getDate()} ${month} ${year}.xlsx` };
+  const day = String(when.getDate()).padStart(2, "0");
+  const mon = String(when.getMonth() + 1).padStart(2, "0");
+  return { year, month, name: `Email letters and SF bills - ${day}.${mon}.${year}.xlsx` };
 }
 
 export function cleanEmail(value: string): string {

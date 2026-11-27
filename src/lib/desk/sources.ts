@@ -36,7 +36,7 @@ export const MACRO_NEEDS: Record<"ax" | "infotrack" | "kindertons" | "letters", 
     {
       id: "lists",
       title: "Saved lists",
-      detail: "Where today's matter list is saved, in a year folder and a month folder. The usual folder is Y:\\accounts\\Tools\\Task application",
+      detail: "Where the matter lists are saved, in a year folder and a month folder. Outstanding letters are the files in last month and this month whose name does not contain SENT. The usual folder is Y:\\accounts\\BANK UPLOADS & PAYMENTS\\LETTERS TO BE SENT",
       folder: true,
     },
     {

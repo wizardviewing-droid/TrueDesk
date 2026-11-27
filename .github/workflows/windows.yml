@@ -40,7 +40,7 @@ jobs:
       - name: Zip the app
         shell: pwsh
         run: |
-          Set-Content -Path desktop/release/version.txt -Value "1.0.28" -NoNewline
+          Set-Content -Path desktop/release/version.txt -Value "1.0.29" -NoNewline
           Compress-Archive -Force -Path desktop/release/TrueDesk.exe, desktop/release/version.txt -DestinationPath desktop/release/TrueDesk.zip
       - name: Keep a copy of the zip
         uses: actions/upload-artifact@v4
@@ -54,8 +54,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          tag=v1.0.28
-          notes="Windows app for the accounts desk. Unzip TrueDesk.zip into Y:\\accounts\\Tools\\Task application. Letters and SF bills opens a grid to type the matter number and Y or N. Run shows a green tick or a red cross. It does not ask you to import a spreadsheet."
+          tag=v1.0.29
+          notes="Windows app for the accounts desk. Unzip TrueDesk.zip into Y:\\accounts\\Tools\\Task application. Outstanding letters are the files in last month and this month under Letters to be sent, unless the name contains SENT. The file picker shows every file."
           for i in 1 2 3 4 5 6; do
             if gh release view "$tag" >/dev/null 2>&1; then
               break

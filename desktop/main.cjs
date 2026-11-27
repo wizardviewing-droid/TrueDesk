@@ -101,29 +101,32 @@ function insideRoot(root, target) {
 
 ipcMain.handle("letters-list", async (_event, root) => {
   const base = assertDeskPath(root);
-  let years = [];
-  try {
-    years = await fs.promises.readdir(base, { withFileTypes: true });
-  } catch {
-    return [];
-  }
+  const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const now = new Date();
+  const targets = [new Date(now.getFullYear(), now.getMonth() - 1, 1), now].map((date) => ({
+    year: String(date.getFullYear()),
+    month: months[date.getMonth()],
+  }));
   const found = [];
-  for (const year of years) {
-    if (!year.isDirectory() || !/^(19|20)\d{2}$/.test(year.name)) continue;
-    const yearPath = path.join(base, year.name);
-    const months = await fs.promises.readdir(yearPath, { withFileTypes: true });
-    for (const month of months) {
-      if (!month.isDirectory()) continue;
-      const monthPath = path.join(yearPath, month.name);
-      const files = await fs.promises.readdir(monthPath, { withFileTypes: true });
-      for (const file of files) {
-        if (!file.isFile() || !/\.xlsx?$/i.test(file.name) && !/\.xlsm$/i.test(file.name)) continue;
-        if (/^sent\b/i.test(file.name)) continue;
-        found.push({ name: file.name, path: path.join(monthPath, file.name), year: year.name, month: month.name });
-      }
+  for (const target of targets) {
+    const yearPath = path.join(base, target.year);
+    let entries = [];
+    try {
+      entries = await fs.promises.readdir(yearPath, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    const folder = entries.find((entry) => entry.isDirectory() && entry.name.toLowerCase().startsWith(target.month.toLowerCase()));
+    if (!folder) continue;
+    const monthPath = path.join(yearPath, folder.name);
+    const files = await fs.promises.readdir(monthPath, { withFileTypes: true });
+    for (const file of files) {
+      if (!file.isFile() || file.name.startsWith("~$") || file.name.startsWith(".")) continue;
+      if (/sent/i.test(file.name)) continue;
+      found.push({ name: file.name, path: path.join(monthPath, file.name), year: target.year, month: folder.name });
     }
   }
-  found.sort((a, b) => a.path.localeCompare(b.path));
+  found.sort((a, b) => a.name.localeCompare(b.name));
   return found;
 });
 
@@ -180,10 +183,6 @@ ipcMain.handle("pick-file", async () => {
   const result = await dialog.showOpenDialog(parent ?? undefined, {
     title: "Select the file",
     properties: ["openFile"],
-    filters: [
-      { name: "Spreadsheets", extensions: ["xlsx", "xlsm", "xlsb", "xls", "csv"] },
-      { name: "All files", extensions: ["*"] },
-    ],
   });
   if (result.canceled || !result.filePaths[0]) return null;
   return result.filePaths[0];

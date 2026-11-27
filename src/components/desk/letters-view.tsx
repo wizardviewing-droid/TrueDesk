@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import * as XLSX from "xlsx";
 import { desktopApi, filesFromPath } from "@/lib/desk/desktop";
-import { LETTER_PATHS, LETTER_TO, billFile, cleanEmail, letterBody, letterFile, listStamp } from "@/lib/desk/letters";
+import { LETTER_PATHS, LETTER_TO, OLD_LISTS_PATH, billFile, cleanEmail, letterBody, letterFile, listStamp } from "@/lib/desk/letters";
 import { bytesToBase64 } from "@/lib/desk/tools-run";
 import type { DeskTool } from "@/lib/desk/types";
 import { useDesk } from "@/lib/desk/store";
@@ -16,7 +16,9 @@ function emptyLine(): Line {
 }
 
 function lookup(tool: DeskTool, id: string): string {
-  return tool.lookups?.find((item) => item.id === id)?.path?.trim() || LETTER_PATHS[id] || "";
+  const saved = tool.lookups?.find((item) => item.id === id)?.path?.trim() || "";
+  if (id === "lists" && (!saved || saved.replace(/[\\/]+$/g, "").toLowerCase() === OLD_LISTS_PATH.toLowerCase())) return LETTER_PATHS.lists;
+  return saved || LETTER_PATHS[id] || "";
 }
 
 function sheetRows(bytes: ArrayBuffer, preferred: string): string[][] {
@@ -115,9 +117,9 @@ export function LettersDesk({ tool }: { tool: DeskTool }) {
     setSelected(filePath);
     setRan(false);
     setNote("");
-    const [saved] = await filesFromPath(filePath);
+    const [saved] = await filesFromPath(filePath).catch(() => []);
     if (!saved) {
-      setNote("That list could not be read.");
+      setNote("That file could not be read into the grid. Choose the spreadsheet of matter numbers.");
       return;
     }
     const table = sheetRows(await saved.arrayBuffer(), "Matters").slice(1);
@@ -349,6 +351,7 @@ export function LettersDesk({ tool }: { tool: DeskTool }) {
           <h3 className="font-semibold text-navy">Outstanding letters</h3>
           <button type="button" className="btn btn-ghost" onClick={() => void refresh()}>Refresh</button>
         </div>
+        <p className="border-b border-line px-4 py-2 text-sm text-muted">Last month and this month, in Letters to be sent. Any file whose name does not contain SENT. Click one to load it into the grid.</p>
         {outstanding.length ? (
           <ul className="max-h-48 overflow-auto">
             {outstanding.map((file) => (
@@ -360,7 +363,7 @@ export function LettersDesk({ tool }: { tool: DeskTool }) {
               </li>
             ))}
           </ul>
-        ) : <p className="px-4 py-3 text-sm text-muted">No lists are waiting. A file leaves this list when you confirm it is completed.</p>}
+        ) : <p className="px-4 py-3 text-sm text-muted">Nothing is waiting in last month or this month.</p>}
       </div>
       <div className="flex flex-wrap gap-2">
         <button type="button" className="btn btn-navy" disabled={Boolean(busy)} onClick={() => void runSelected()}>Run</button>

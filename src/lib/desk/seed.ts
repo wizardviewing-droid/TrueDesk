@@ -41,7 +41,7 @@ export function buildSeed(): DeskData {
         pinned: false,
         lookups: [
           { id: "bills", path: "Y:\\accounts\\success fee bills\\" },
-          { id: "lists", path: "Y:\\accounts\\Tools\\Task application" },
+          { id: "lists", path: "Y:\\accounts\\BANK UPLOADS & PAYMENTS\\LETTERS TO BE SENT" },
         ],
       },
     ],
@@ -55,9 +55,19 @@ const SAMPLE_KINDS = new Set(["limitation", "time", "bundle", "disbursement", "c
 export function withStandardTools(data: DeskData): DeskData {
   const retired = new Set(data.retiredTools ?? []);
   const kept = data.tools.filter((tool) => !SAMPLE_KINDS.has(tool.kind) && !retired.has(tool.id));
-  const repaired = kept.map((tool) =>
-    tool.id === "tool-letters" || /letters and sf/i.test(tool.name) ? (tool.kind === "letters" ? tool : { ...tool, kind: "letters" as const }) : tool,
-  );
+  const repaired = kept.map((tool) => {
+    if (tool.id !== "tool-letters" && !/letters and sf/i.test(tool.name)) return tool;
+    const lookups = [...(tool.lookups ?? [])];
+    const lists = lookups.find((item) => item.id === "lists");
+    const oldLists = !lists?.path || lists.path.replace(/[\\/]+$/g, "").toLowerCase() === "y:\\accounts\\tools\\task application";
+    const nextLookups = oldLists
+      ? [...lookups.filter((item) => item.id !== "lists"), { id: "lists", path: "Y:\\accounts\\BANK UPLOADS & PAYMENTS\\LETTERS TO BE SENT" }]
+      : lookups;
+    const sameKind = tool.kind === "letters";
+    const sameLists = !oldLists;
+    if (sameKind && sameLists) return tool;
+    return { ...tool, kind: "letters" as const, lookups: nextLookups };
+  });
   const ids = new Set(repaired.map((tool) => tool.id));
   const extra = buildSeed().tools.filter((tool) => !ids.has(tool.id) && !retired.has(tool.id));
   let users = data.users.map((user) => {
